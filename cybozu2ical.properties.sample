@@ -1,0 +1,14 @@
+##Office接続情報
+#接続先URL
+officeURL=http://xxxxx/cgi-bin/cbag/ag.cgi
+#API実行ユーザーログイン名
+username=takahashi
+#API実行ユーザーパスワード
+password=password
+
+#登録対象ユーザーの識別項目
+# id：内部ユーザーID、name：ログイン名
+keyitem=name
+
+# スケジュールデータの出力先ディレクトリ
+exportdir=/var/office/export

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project name="cybozu2ical-java" default="jar" basedir="./">
+    <property name="src" value="${basedir}/src/"/>
+    <property name="build" value="${basedir}/build/"/>
+    <property name="javac.args" value="-Xlint:unchecked -Xlint:deprecaton -encoding UTF8"/>
+    <property name="conf" value="${basedir}/conf/"/>
+
+    <path id="classpath">
+        <pathelement location="${build}"/>
+        <fileset dir="lib">
+            <include name="**/*.jar"/>
+        </fileset>
+    </path>
+
+    <target name="init">
+        <tstamp/>
+        <mkdir dir="${build}"/>
+    </target>
+
+    <target name="config">
+        <script language="javascript"><![CDATA[
+
+        // import statements
+        importClass(java.io.File);
+
+        // access to Ant-Properties by their names
+        dir       = project.getProperty("basedir");
+        var file  = new File(dir, "debug");
+        var debug = file.exists();
+
+        project.setProperty("debugflag", debug);
+        print("debugflag: " + debug);
+
+        ]]></script>
+    </target>
+
+    <!-- Compile the Java files -->
+    <target name="compile" depends="init,config">
+        <javac srcdir="${src}" destdir="${build}" includeAntRuntime="no"
+               debug="${debugflag}" debuglevel="lines,vars,source">
+            <compilerarg line="${javac.args}"/>
+            <classpath refid="classpath"/>
+        </javac>
+    </target>
+
+    <target name="jar" depends="compile" description="Make cybozu2ical.jar">
+        <delete file="${basedir}/cybozu2ical.jar"/>
+        <jar jarfile="${basedir}/cybozu2ical.jar">
+            <fileset dir="${build}"/>
+        </jar>
+    </target>
+
+    <target name="clean"
+            description="Clean. Delete the build files and their directories">
+        <delete dir="${build}"/>
+    </target>
+
+</project>

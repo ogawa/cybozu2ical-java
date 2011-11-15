@@ -1,0 +1,6 @@
+/bin
+/build
+/cybozu2ical.jar
+/*.properties
+/*.csv
+.DS_Store
