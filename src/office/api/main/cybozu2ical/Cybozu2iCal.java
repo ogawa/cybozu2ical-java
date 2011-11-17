@@ -34,8 +34,8 @@ import jp.co.joyzo.office.api.schedule.util.Span;
 import jp.co.joyzo.office.api.base.BaseGetUsersByLoginName;
 import jp.co.joyzo.office.api.common.CBServiceClient;
 
-import net.fortuna.ical4j.model.*;
-import net.fortuna.ical4j.model.component.*;
+import net.fortuna.ical4j.model.PropertyList;
+import net.fortuna.ical4j.model.component.VEvent;
 import net.fortuna.ical4j.model.property.*;
 
 public class Cybozu2iCal {
@@ -167,21 +167,22 @@ public class Cybozu2iCal {
         continue;
       }
 
-      String loginID = "";
       String loginName = columns[0];
       String startDate = columns[1];
       String endDate = columns[2];
 
+      // generate loginID for getEventsByTarget
+      String loginID;
       if (config.getKeyItem().trim().equals(KEYITEM_NAME)) {
-        String lid = getLoginIDByLoginName(client, columns[0]);
-        if (lid == null) {
-          continue;
-        }
-        loginID = lid;
+        loginID = getLoginIDByLoginName(client, columns[0]);
       } else {
         loginID = columns[0];
       }
+      if (loginID == null) {
+        continue;
+      }
 
+      // generate span for getEventsByTarget
       Span span = new Span();
       try {
         Date start = spanFormatter.parse(startDate);
@@ -198,10 +199,6 @@ public class Cybozu2iCal {
         logger.warning(pe.getMessage());
         continue;
       }
-
-      ScheduleGetEventsByTarget action = new ScheduleGetEventsByTarget();
-      action.setSpan(span);
-      action.addUserID(loginID);
 
       OMElement result = getEventsByTarget(client, loginID, span);
       List<VEvent> eventList = createEventList(result);
@@ -360,7 +357,6 @@ public class Cybozu2iCal {
     OMElement result = null;
     try {
       result = client.sendReceive(action);
-      System.out.println(result.toString());
     } catch (ConnectTimeoutException e) {
       logger.severe(e.getMessage());
     } catch (AxisFault ae) {
