@@ -57,6 +57,8 @@ public class Cybozu2iCal {
     ALLDAY_FORMATTER.setTimeZone(TimeZone.getTimeZone("UTC"));
   }
 
+  private static String uidFormat = "%s@";
+
   /**
    * サイボウズOfficeからスケジュールを取得し、iCalendar形式のファイルを出力します。
    * 
@@ -106,6 +108,9 @@ public class Cybozu2iCal {
       logger.severe(e.getMessage());
       return;
     }
+
+    URI url = config.getOfficeURL();
+    uidFormat = "%s@" + url.getHost();
 
     logger.info("Finished reading a property file");
 
@@ -398,7 +403,8 @@ public class Cybozu2iCal {
       PropertyList props = new PropertyList();
 
       if (eventMap.containsKey("id")) {
-        props.add(new Uid((String) eventMap.get("id")));
+        props
+            .add(new Uid(String.format(uidFormat, (String) eventMap.get("id"))));
       }
 
       Date dtstart = (Date) eventMap.get("start");
