@@ -233,8 +233,8 @@ public class Cybozu2iCal {
     }
 
     int total = inputDataList.size();
-    logger.info("End Processing (total：" + total + " succeeded：" + succeeded
-        + " failed:" + (total - succeeded));
+    logger.info("End Processing (total:" + total + " succeeded:" + succeeded
+        + " failed:" + (total - succeeded) + ")");
   }
 
   /**
