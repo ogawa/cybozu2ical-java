@@ -69,7 +69,8 @@ public class Cybozu2iCal {
     logger.info("Begin processing");
 
     // プロパティファイルの読み込み
-    String propertiesFile = "./cybozu2ical.properties";
+    String propertiesFile = System.getProperty("user.dir")
+        + System.getProperty("file.separator") + "cybozu2ical.properties";
     String inputFile = "";
 
     // 引数チェック
