@@ -59,6 +59,9 @@ public class Cybozu2iCal {
 
   private static String uidFormat = "%s@";
 
+  private static String sysUserDir = System.getProperty("user.dir");
+  private static String sysFileSeparator = System.getProperty("file.separator");
+
   /**
    * サイボウズOfficeからスケジュールを取得し、iCalendar形式のファイルを出力します。
    * 
@@ -69,8 +72,8 @@ public class Cybozu2iCal {
     logger.info("Begin processing");
 
     // プロパティファイルの読み込み
-    String propertiesFile = System.getProperty("user.dir")
-        + System.getProperty("file.separator") + "cybozu2ical.properties";
+    String propertiesFile = sysUserDir + sysFileSeparator
+        + "cybozu2ical.properties";
     String inputFile = "";
 
     // 引数チェック
@@ -115,13 +118,14 @@ public class Cybozu2iCal {
 
     logger.info("Finished reading a property file");
 
-    String exportdir = config.getExportDir();
-    if (!exportdir.substring(exportdir.length() - 1).equals("/"))
-      exportdir += "/";
+    String exportDir = config.getExportDir();
+    if (!exportDir.substring(exportDir.length() - sysFileSeparator.length())
+        .equals(sysFileSeparator))
+      exportDir += sysFileSeparator;
 
-    File dir = new File(exportdir);
+    File dir = new File(exportDir);
     if (!dir.exists()) {
-      logger.severe("Cannot find (" + exportdir + ")");
+      logger.severe("Cannot find (" + exportDir + ")");
       return;
     }
 
@@ -219,7 +223,7 @@ public class Cybozu2iCal {
       }
 
       try {
-        String exportFile = exportdir + loginName + ".ics";
+        String exportFile = exportDir + loginName + ".ics";
         BufferedWriter writer = new BufferedWriter(new FileWriter(exportFile));
         writer.write(calendar.toString());
         writer.close();
