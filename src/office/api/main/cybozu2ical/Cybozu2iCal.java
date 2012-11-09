@@ -427,7 +427,9 @@ public class Cybozu2iCal {
         props.add(new DtEnd(new net.fortuna.ical4j.model.Date(cal.getTime())));
       } else {
         props.add(new DtStart(new net.fortuna.ical4j.model.DateTime(dtstart)));
-        props.add(new DtEnd(new net.fortuna.ical4j.model.DateTime(dtend)));
+        if (dtend != null) {
+          props.add(new DtEnd(new net.fortuna.ical4j.model.DateTime(dtend)));
+        }
       }
 
       if (eventMap.containsKey("detail")) {
