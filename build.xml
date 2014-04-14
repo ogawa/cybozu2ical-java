@@ -2,7 +2,7 @@
 <project name="cybozu2ical-java" default="jar" basedir="./">
     <property name="src" value="${basedir}/src/"/>
     <property name="build" value="${basedir}/build/"/>
-    <property name="javac.args" value="-Xlint:unchecked -Xlint:deprecaton -encoding UTF8"/>
+    <property name="javac.args" value="-Xlint:unchecked -encoding UTF8"/>
     <property name="conf" value="${basedir}/conf/"/>
 
     <path id="classpath">

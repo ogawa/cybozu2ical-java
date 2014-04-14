@@ -46,17 +46,38 @@ public class Cybozu2iCal {
 
   private static Logger logger = Logger.getLogger("cybozu2ical");
 
+  // 日付用ユーティリティ
   private static final String DATETIME_FORMAT = "yyyy'-'MM'-'dd'T'HH':'mm':'ss'Z'";
   private static SimpleDateFormat DATETIME_FORMATTER;
   private static final String ALLDAY_FORMAT = "yyyy'-'MM'-'dd";
   private static SimpleDateFormat ALLDAY_FORMATTER;
+  private static final String LOCAL_DATETIME_FORMAT = "yyyy'-'MM'-'dd'T'HH':'mm':'ss";
+  private static SimpleDateFormat LOCAL_DATETIME_FORMATTER;
   static {
     DATETIME_FORMATTER = new SimpleDateFormat(DATETIME_FORMAT);
     DATETIME_FORMATTER.setTimeZone(TimeZone.getTimeZone("UTC"));
     ALLDAY_FORMATTER = new SimpleDateFormat(ALLDAY_FORMAT);
     ALLDAY_FORMATTER.setTimeZone(TimeZone.getTimeZone("UTC"));
+    LOCAL_DATETIME_FORMATTER = new SimpleDateFormat(LOCAL_DATETIME_FORMAT);
   }
-
+  private static Date parseDate(String str) {
+    Date date = null;
+    try {
+      date = DATETIME_FORMATTER.parse(str);
+    } catch (ParseException pe) {
+      try {
+        date = LOCAL_DATETIME_FORMATTER.parse(str);
+      } catch (ParseException pe1) {
+        try {
+          date = ALLDAY_FORMATTER.parse(str);
+        } catch (ParseException pe2) {
+          logger.warning("incorrect date format: " + pe2.getMessage());
+        }
+      }
+    }
+    return date;
+  }
+  
   private static String uidFormat = "%s@";
 
   private static String sysUserDir = System.getProperty("user.dir");
@@ -432,6 +453,16 @@ public class Cybozu2iCal {
         }
       }
 
+      //   <condition day="0" end_date="2014-04-02" end_time="12:00:00" start_date="2013-11-07" start_time="10:00:00" type="week" week="4"/>
+      if (eventMap.containsKey("event_type")
+          && eventMap.get("event_type").equals("repeat")) {
+        String conditionType = (String) eventMap.get("condition.type");
+        String conditionWeek = (String) eventMap.get("condition.week");
+        //Recur recur = new Recur("W");
+        
+        String rrule = "FREQ=WEEKLY";
+      }
+
       if (eventMap.containsKey("detail")) {
         props.add(new Summary((String) eventMap.get("detail")));
       }
@@ -496,22 +527,94 @@ public class Cybozu2iCal {
           OMAttribute attr = (OMAttribute) datetimeAttrIter.next();
           String attrName = attr.getLocalName();
           String attrValue = attr.getAttributeValue();
-          Date date = null;
-          try {
-            date = DATETIME_FORMATTER.parse(attrValue);
-          } catch (ParseException pe) {
-            try {
-              date = ALLDAY_FORMATTER.parse(attrValue);
-            } catch (ParseException pe2) {
-              logger.warning("incorrect date format: " + pe2.getMessage());
-            }
-          }
+          Date date = parseDate(attrValue);
           if (date != null) {
             eventMap.put(attrName, date);
           }
         }
       }
       break;
+    }
+
+    // schedule_event/repeat_info
+    Iterator<?> repeatInfoIter = event.getChildrenWithLocalName("repeat_info");
+    while (repeatInfoIter.hasNext()) {
+      OMElement repeatInfo = (OMElement) repeatInfoIter.next();
+      Iterator<?> conditionIter = repeatInfo
+          .getChildrenWithLocalName("condition");
+
+      while (conditionIter.hasNext()) {
+        OMElement condition = (OMElement) conditionIter.next();
+        if (condition != null) {
+          Iterator<?> conditionAttr = condition.getAllAttributes();
+          while (conditionAttr.hasNext()) {
+            OMAttribute attr = (OMAttribute) conditionAttr.next();
+            String attrName = "condition." + attr.getLocalName();
+            String attrValue = attr.getAttributeValue();
+            eventMap.put(attrName, attrValue);
+          }
+          String start_date = (String) eventMap.get("condition.start_date");
+          String start_time = (String) eventMap.get("condition.start_time");
+          String end_date = (String) eventMap.get("condition.end_date");
+          String end_time = (String) eventMap.get("condition.end_time");
+          String start = null;
+          String end = null;
+          if (start_date != null) {
+            start = start_date;
+            if (start_time != null) {
+              start += "T" + start_time;
+            }
+            if (end_date != null) {
+              end = end_date;
+            } else {
+              end = start_date;
+            }
+            if (end_time != null) {
+              end += "T" + end_time;
+            }
+          }
+          Date startDate = parseDate(start);
+          if (startDate != null) {
+            eventMap.put("condition.start", startDate);
+          }
+          Date endDate = parseDate(end);
+          if (endDate != null) {
+            eventMap.put("condition.end", endDate);
+          }
+        }
+      }
+      Iterator<?> exclusiveDatetimesIter = repeatInfo
+          .getChildrenWithLocalName("exclusive_datetimes");
+      List<Date> exclusiveDatesStart = new ArrayList<Date>();
+      List<Date> exclusiveDatesEnd = new ArrayList<Date>();
+      while (exclusiveDatetimesIter.hasNext()) {
+        OMElement exclusiveDatetimes = (OMElement) exclusiveDatetimesIter
+            .next();
+        Iterator<?> exclusiveDatetimeIter = exclusiveDatetimes
+            .getChildrenWithLocalName("exclusive_datetime");
+        while (exclusiveDatetimeIter.hasNext()) {
+          OMElement exclusiveDatetime = (OMElement) exclusiveDatetimeIter
+              .next();
+          Iterator<?> exclusiveDatetimeAttr = exclusiveDatetime
+              .getAllAttributes();
+          while (exclusiveDatetimeAttr.hasNext()) {
+            OMAttribute attr = (OMAttribute) exclusiveDatetimeAttr.next();
+            String attrName = attr.getLocalName();
+            String attrValue = attr.getAttributeValue();
+            if (attrName.equals("start")) {
+              exclusiveDatesStart.add(parseDate(attrValue));
+            } else if (attrName.equals("end")) {
+              exclusiveDatesEnd.add(parseDate(attrValue));
+            }
+          }
+        }
+      }
+      if (exclusiveDatesStart != null) {
+        eventMap.put("exclusiveDates.start", exclusiveDatesStart);
+      }
+      if (exclusiveDatesEnd != null) {
+        eventMap.put("exclusiveDates.end", exclusiveDatesEnd);
+      }
     }
 
     return eventMap;
