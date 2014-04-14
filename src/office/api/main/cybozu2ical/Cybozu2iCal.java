@@ -35,6 +35,9 @@ import jp.co.joyzo.office.api.base.BaseGetUsersByLoginName;
 import jp.co.joyzo.office.api.common.CBServiceClient;
 
 import net.fortuna.ical4j.model.PropertyList;
+import net.fortuna.ical4j.model.Recur;
+import net.fortuna.ical4j.model.WeekDay;
+import net.fortuna.ical4j.model.DateList;
 import net.fortuna.ical4j.model.component.VEvent;
 import net.fortuna.ical4j.model.property.*;
 
@@ -60,6 +63,7 @@ public class Cybozu2iCal {
     ALLDAY_FORMATTER.setTimeZone(TimeZone.getTimeZone("UTC"));
     LOCAL_DATETIME_FORMATTER = new SimpleDateFormat(LOCAL_DATETIME_FORMAT);
   }
+
   private static Date parseDate(String str) {
     Date date = null;
     try {
@@ -77,7 +81,7 @@ public class Cybozu2iCal {
     }
     return date;
   }
-  
+
   private static String uidFormat = "%s@";
 
   private static String sysUserDir = System.getProperty("user.dir");
@@ -180,13 +184,6 @@ public class Cybozu2iCal {
       return;
     }
 
-    // DateFormatters for an input CSV
-    String format = "yyyy'/'MM'/'dd HH':'mm";
-    SimpleDateFormat spanFormatter = new SimpleDateFormat(format);
-    spanFormatter.setLenient(false);
-    SimpleDateFormat UTCFomatter = new SimpleDateFormat(format);
-    UTCFomatter.setTimeZone(TimeZone.getTimeZone("UTC"));
-
     int succeeded = 0;
     for (String data : inputDataList) {
       logger.info("Begin Processing: " + data);
@@ -215,20 +212,13 @@ public class Cybozu2iCal {
 
       // generate span for getEventsByTarget
       Span span = new Span();
-      try {
-        Date start = spanFormatter.parse(startDate);
-        start = spanFormatter.parse(UTCFomatter.format(start));
-        Date end = spanFormatter.parse(endDate);
-        end = spanFormatter.parse(UTCFomatter.format(end));
-        if (start.after(end)) {
-          logger.warning("endDate is earlier than startDate");
-          continue;
-        }
-        span.setStart(start);
-        span.setEnd(end);
-      } catch (ParseException pe) {
-        logger.warning(pe.getMessage());
-        continue;
+      Date spanStart = parseDate(startDate);
+      if (spanStart != null) {
+        span.setStart(spanStart);
+      }
+      Date spanEnd = parseDate(endDate);
+      if (spanEnd != null) {
+        span.setEnd(spanEnd);
       }
 
       OMElement result = getEventsByTarget(client, loginID, span);
@@ -408,6 +398,14 @@ public class Cybozu2iCal {
     return result;
   }
 
+  static WeekDay[] weekDays = { WeekDay.MO, WeekDay.TU, WeekDay.WE, WeekDay.TH,
+      WeekDay.FR, WeekDay.SA, WeekDay.SU };
+
+  private static WeekDay index2weekDay(String week) {
+    int index = Integer.parseInt(week) - 1;
+    return weekDays[index];
+  }
+
   /**
    * SOAPで取得したデータからイベントデータのリストを作成します
    * 
@@ -418,7 +416,7 @@ public class Cybozu2iCal {
    */
   private static List<VEvent> createEventList(OMElement node) {
 
-    List<VEvent> eventList = new ArrayList<VEvent>();
+    HashMap<String, VEvent> eventsMap = new HashMap<String, VEvent>();
 
     Iterator<?> eventIter = node.getFirstElement().getChildrenWithLocalName(
         "schedule_event");
@@ -453,14 +451,39 @@ public class Cybozu2iCal {
         }
       }
 
-      //   <condition day="0" end_date="2014-04-02" end_time="12:00:00" start_date="2013-11-07" start_time="10:00:00" type="week" week="4"/>
+      // <condition day="0" end_date="2014-04-02" end_time="12:00:00"
+      // start_date="2013-11-07" start_time="10:00:00" type="week" week="4"/>
       if (eventMap.containsKey("event_type")
           && eventMap.get("event_type").equals("repeat")) {
         String conditionType = (String) eventMap.get("condition.type");
-        String conditionWeek = (String) eventMap.get("condition.week");
-        //Recur recur = new Recur("W");
-        
-        String rrule = "FREQ=WEEKLY";
+        if (conditionType.equals("week")) {
+          String conditionWeek = (String) eventMap.get("condition.week");
+          Recur recur = new Recur();
+          recur.setFrequency(Recur.WEEKLY);
+          recur.setWeekStartDay(index2weekDay(conditionWeek).toString());
+          if (eventMap.containsKey("condition.end_date")) {
+            String endDate = (String) eventMap.get("condition.end_date");
+            if (eventMap.containsKey("condition.end_time")) {
+              endDate += "T" + eventMap.get("condition.end_time");
+            }
+            recur
+                .setUntil(new net.fortuna.ical4j.model.Date(parseDate(endDate)));
+          }
+          props.add(new RRule(recur));
+        }
+
+        if (eventMap.containsKey("exclusiveDates.start")) {
+          @SuppressWarnings("unchecked")
+          List<Date> dates = (List<Date>) eventMap.get("exclusiveDates.start");
+          DateList dateList = new DateList();
+          for (Date date : dates) {
+            dateList.add(new net.fortuna.ical4j.model.Date(date));
+          }
+          if (dateList != null) {
+            props.add(new ExDate(dateList));
+          }
+        }
+
       }
 
       if (eventMap.containsKey("detail")) {
@@ -474,9 +497,25 @@ public class Cybozu2iCal {
       }
 
       VEvent vevent = new VEvent(props);
-      eventList.add(vevent);
+
+      String key = String.format(uidFormat, (String) eventMap.get("id"));
+      if (eventsMap.containsKey(key)) {
+        VEvent value = eventsMap.get(key);
+        String prevDate = value.getStartDate().getValue();
+        String currentDate = vevent.getStartDate().getValue();
+        if (currentDate.compareTo(prevDate) < 0) {
+          eventsMap.put(key, vevent);
+        }
+      } else {
+        eventsMap.put(key, vevent);
+      }
+
     }
 
+    List<VEvent> eventList = new ArrayList<VEvent>();
+    for (VEvent vevent : eventsMap.values()) {
+      eventList.add(vevent);
+    }
     return eventList;
   }
 
@@ -601,6 +640,7 @@ public class Cybozu2iCal {
             OMAttribute attr = (OMAttribute) exclusiveDatetimeAttr.next();
             String attrName = attr.getLocalName();
             String attrValue = attr.getAttributeValue();
+            attrValue = attrValue.substring(0, 10);
             if (attrName.equals("start")) {
               exclusiveDatesStart.add(parseDate(attrValue));
             } else if (attrName.equals("end")) {
