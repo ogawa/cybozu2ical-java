@@ -1,11 +1,10 @@
 package office.api.main.cybozu2ical;
 
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.net.URI;
 import java.text.ParseException;
@@ -34,8 +33,10 @@ import jp.co.joyzo.office.api.schedule.util.Span;
 import jp.co.joyzo.office.api.base.BaseGetUsersByLoginName;
 import jp.co.joyzo.office.api.common.CBServiceClient;
 
+import net.fortuna.ical4j.data.CalendarOutputter;
 import net.fortuna.ical4j.model.PropertyList;
 import net.fortuna.ical4j.model.Recur;
+import net.fortuna.ical4j.model.ValidationException;
 import net.fortuna.ical4j.model.WeekDay;
 import net.fortuna.ical4j.model.DateList;
 import net.fortuna.ical4j.model.component.VEvent;
@@ -222,6 +223,7 @@ public class Cybozu2iCal {
       }
 
       OMElement result = getEventsByTarget(client, loginID, span);
+      System.out.println(result.toString());
       List<VEvent> eventList = createEventList(result);
 
       net.fortuna.ical4j.model.Calendar calendar = new net.fortuna.ical4j.model.Calendar();
@@ -235,13 +237,17 @@ public class Cybozu2iCal {
 
       try {
         String exportFile = exportDir + loginName + ".ics";
-        BufferedWriter writer = new BufferedWriter(new FileWriter(exportFile));
-        writer.write(calendar.toString());
-        writer.close();
+        FileOutputStream out = new FileOutputStream(exportFile);
+        CalendarOutputter outputter = new CalendarOutputter();
+        // outputter.setValidating(false);
+        outputter.output(calendar, out);
         logger.info("Created (" + exportFile + ")");
       } catch (IOException e) {
         logger.severe(e.getMessage());
         return;
+      } catch (ValidationException e) {
+        // TODO Auto-generated catch block
+        e.printStackTrace();
       }
 
       logger.info("End Processing: " + data);
@@ -430,60 +436,27 @@ public class Cybozu2iCal {
         props
             .add(new Uid(String.format(uidFormat, (String) eventMap.get("id"))));
       }
+      props.add(new DtStamp());
 
-      Date dtstart = (Date) eventMap.get("start");
-      Date dtend = (Date) eventMap.get("end");
-      if (eventMap.containsKey("allday")
-          && eventMap.get("allday").equals("true")) {
-        props.add(new DtStart(new net.fortuna.ical4j.model.Date(dtstart)));
-      } else if (eventMap.containsKey("event_type")
-          && eventMap.get("event_type").equals("banner")) {
-        props.add(new DtStart(new net.fortuna.ical4j.model.Date(dtstart)));
-        // dtend has to be incremented.
-        Calendar cal = Calendar.getInstance();
-        cal.setTime(dtend);
-        cal.add(Calendar.DAY_OF_MONTH, 1);
-        props.add(new DtEnd(new net.fortuna.ical4j.model.Date(cal.getTime())));
-      } else {
-        props.add(new DtStart(new net.fortuna.ical4j.model.DateTime(dtstart)));
-        if (dtend != null) {
-          props.add(new DtEnd(new net.fortuna.ical4j.model.DateTime(dtend)));
-        }
-      }
-
-      // <condition day="0" end_date="2014-04-02" end_time="12:00:00"
-      // start_date="2013-11-07" start_time="10:00:00" type="week" week="4"/>
-      if (eventMap.containsKey("event_type")
-          && eventMap.get("event_type").equals("repeat")) {
-        String conditionType = (String) eventMap.get("condition.type");
-        if (conditionType.equals("week")) {
-          String conditionWeek = (String) eventMap.get("condition.week");
-          Recur recur = new Recur();
-          recur.setFrequency(Recur.WEEKLY);
-          recur.setWeekStartDay(index2weekDay(conditionWeek).toString());
-          if (eventMap.containsKey("condition.end_date")) {
-            String endDate = (String) eventMap.get("condition.end_date");
-            if (eventMap.containsKey("condition.end_time")) {
-              endDate += "T" + eventMap.get("condition.end_time");
-            }
-            recur
-                .setUntil(new net.fortuna.ical4j.model.Date(parseDate(endDate)));
+      if (eventMap.containsKey("event_type")) {
+        String eventType = (String) eventMap.get("event_type");
+        if (eventType.equals("normal")) {
+          if (eventMap.containsKey("allday")
+              && eventMap.get("allday").equals("true")) {
+            createNormalAllDayEvent(props, eventMap);
+          } else {
+            createNormalEvent(props, eventMap);
           }
-          props.add(new RRule(recur));
-        }
-
-        if (eventMap.containsKey("exclusiveDates.start")) {
-          @SuppressWarnings("unchecked")
-          List<Date> dates = (List<Date>) eventMap.get("exclusiveDates.start");
-          DateList dateList = new DateList();
-          for (Date date : dates) {
-            dateList.add(new net.fortuna.ical4j.model.Date(date));
+        } else if (eventType.equals("repeat")) {
+          if (eventMap.containsKey("allday")
+              && eventMap.get("allday").equals("true")) {
+            createRepeatedAllDayEvent(props, eventMap);
+          } else {
+            createRepeatedEvent(props, eventMap);
           }
-          if (dateList != null) {
-            props.add(new ExDate(dateList));
-          }
+        } else if (eventType.equals("banner")) {
+          createBannerEvent(props, eventMap);
         }
-
       }
 
       if (eventMap.containsKey("detail")) {
@@ -517,6 +490,105 @@ public class Cybozu2iCal {
       eventList.add(vevent);
     }
     return eventList;
+  }
+
+  private static void createRepeatedAllDayEvent(PropertyList props,
+      HashMap<String, Object> eventMap) {
+    Date dtstart = (Date) eventMap.get("condition.start");
+    if (dtstart == null) {
+      dtstart = (Date) eventMap.get("start");
+    }
+    if (dtstart != null) {
+      props.add(new DtStart(new net.fortuna.ical4j.model.Date(dtstart)));
+    }
+    createRepeatedEvent(props, eventMap);
+  }
+
+  private static void createRepeatedEvent(PropertyList props,
+      HashMap<String, Object> eventMap) {
+
+    if (props.getProperty(net.fortuna.ical4j.model.Property.DTSTART) == null) {
+      Date dtstart = (Date) eventMap.get("condition.start");
+      if (dtstart == null) {
+        dtstart = (Date) eventMap.get("start");
+      }
+      if (dtstart != null) {
+        props.add(new DtStart(new net.fortuna.ical4j.model.DateTime(dtstart)));
+      }
+      Date dtend = (Date) eventMap.get("condition.end");
+      if (dtend == null) {
+        dtend = (Date) eventMap.get("end");
+      }
+      if (dtend != null) {
+        props.add(new DtEnd(new net.fortuna.ical4j.model.DateTime(dtend)));
+      }
+    }
+
+    String conditionType = (String) eventMap.get("condition.type");
+    if (conditionType.equals("week")) {
+      String conditionWeek = (String) eventMap.get("condition.week");
+      Recur recur = new Recur();
+      recur.setFrequency(Recur.WEEKLY);
+      recur.setWeekStartDay(index2weekDay(conditionWeek).toString());
+      if (eventMap.containsKey("condition.end_date")) {
+        String endDate = (String) eventMap.get("condition.end_date");
+        if (eventMap.containsKey("condition.end_time")) {
+          endDate += "T" + eventMap.get("condition.end_time");
+        }
+        recur.setUntil(new net.fortuna.ical4j.model.Date(parseDate(endDate)));
+      }
+      props.add(new RRule(recur));
+    }
+
+    if (eventMap.containsKey("exclusiveDates.start")) {
+      @SuppressWarnings("unchecked")
+      List<Date> dates = (List<Date>) eventMap.get("exclusiveDates.start");
+      DateList dateList = new DateList();
+      for (Date date : dates) {
+        dateList.add(new net.fortuna.ical4j.model.Date(date));
+      }
+      if (!dateList.isEmpty()) {
+        dateList = new DateList(dateList,
+            net.fortuna.ical4j.model.parameter.Value.DATE);
+        props.add(new ExDate(dateList));
+      }
+    }
+  }
+
+  private static void createNormalEvent(PropertyList props,
+      HashMap<String, Object> eventMap) {
+    Date dtstart = (Date) eventMap.get("start");
+    if (dtstart != null) {
+      props.add(new DtStart(new net.fortuna.ical4j.model.DateTime(dtstart)));
+    }
+    Date dtend = (Date) eventMap.get("end");
+    if (dtend != null) {
+      props.add(new DtEnd(new net.fortuna.ical4j.model.DateTime(dtend)));
+    }
+  }
+
+  private static void createNormalAllDayEvent(PropertyList props,
+      HashMap<String, Object> eventMap) {
+    Date dtstart = (Date) eventMap.get("start");
+    if (dtstart != null) {
+      props.add(new DtStart(new net.fortuna.ical4j.model.Date(dtstart)));
+    }
+  }
+
+  private static void createBannerEvent(PropertyList props,
+      HashMap<String, Object> eventMap) {
+    Date dtstart = (Date) eventMap.get("start");
+    if (dtstart != null) {
+      props.add(new DtStart(new net.fortuna.ical4j.model.Date(dtstart)));
+    }
+    Date dtend = (Date) eventMap.get("end");
+    if (dtend != null) {
+      // dtend has to be incremented.
+      Calendar cal = Calendar.getInstance();
+      cal.setTime(dtend);
+      cal.add(Calendar.DAY_OF_MONTH, 1);
+      props.add(new DtEnd(new net.fortuna.ical4j.model.Date(cal.getTime())));
+    }
   }
 
   /**
@@ -594,7 +666,6 @@ public class Cybozu2iCal {
           }
           String start_date = (String) eventMap.get("condition.start_date");
           String start_time = (String) eventMap.get("condition.start_time");
-          String end_date = (String) eventMap.get("condition.end_date");
           String end_time = (String) eventMap.get("condition.end_time");
           String start = null;
           String end = null;
@@ -603,11 +674,7 @@ public class Cybozu2iCal {
             if (start_time != null) {
               start += "T" + start_time;
             }
-            if (end_date != null) {
-              end = end_date;
-            } else {
-              end = start_date;
-            }
+            end = start_date;
             if (end_time != null) {
               end += "T" + end_time;
             }
