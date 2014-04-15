@@ -482,7 +482,6 @@ public class Cybozu2iCal {
       } else {
         eventsMap.put(key, vevent);
       }
-
     }
 
     List<VEvent> eventList = new ArrayList<VEvent>();
@@ -530,6 +529,37 @@ public class Cybozu2iCal {
       Recur recur = new Recur();
       recur.setFrequency(Recur.WEEKLY);
       recur.setWeekStartDay(index2weekDay(conditionWeek).toString());
+      if (eventMap.containsKey("condition.end_date")) {
+        String endDate = (String) eventMap.get("condition.end_date");
+        if (eventMap.containsKey("condition.end_time")) {
+          endDate += "T" + eventMap.get("condition.end_time");
+        }
+        recur.setUntil(new net.fortuna.ical4j.model.Date(parseDate(endDate)));
+      }
+      props.add(new RRule(recur));
+    } else if (conditionType.equals("1stweek")
+        || conditionType.equals("2ndweek") || conditionType.equals("3rdweek")
+        || conditionType.equals("4thweek") || conditionType.equals("5thweek")) {
+      int numOfWeek = Integer.parseInt(conditionType.substring(0, 1));
+      String conditionWeek = (String) eventMap.get("condition.week");
+      Recur recur = new Recur();
+      recur.setFrequency(Recur.MONTHLY);
+      recur.getDayList().add(
+          new WeekDay(index2weekDay(conditionWeek), numOfWeek));
+      if (eventMap.containsKey("condition.end_date")) {
+        String endDate = (String) eventMap.get("condition.end_date");
+        if (eventMap.containsKey("condition.end_time")) {
+          endDate += "T" + eventMap.get("condition.end_time");
+        }
+        recur.setUntil(new net.fortuna.ical4j.model.Date(parseDate(endDate)));
+      }
+      props.add(new RRule(recur));
+    } else if (conditionType.equals("month")) {
+      String conditionDay = (String) eventMap.get("condition.day");
+      Recur recur = new Recur();
+      System.out.println("HELO");
+      recur.setFrequency(Recur.MONTHLY);
+      recur.getMonthDayList().add(Integer.parseInt(conditionDay));
       if (eventMap.containsKey("condition.end_date")) {
         String endDate = (String) eventMap.get("condition.end_date");
         if (eventMap.containsKey("condition.end_time")) {
