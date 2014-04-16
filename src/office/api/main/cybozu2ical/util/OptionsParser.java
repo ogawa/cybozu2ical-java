@@ -19,9 +19,10 @@ import org.apache.commons.cli.ParseException;
  * @version $api_version ver 1.0.0$
  */
 public class OptionsParser {
-  private static final String OPTION_KEY_INI_FILE = "c";
-  private static final String OPTION_KEY_INPUT_FILE = "i";
-  private static final String OPTION_KEY_CHARA_SET = "s";
+  private static final String OPTION_INI_FILE = "c";
+  private static final String OPTION_INPUT_FILE = "i";
+  private static final String OPTION_CHARSET = "s";
+  private static final String OPTION_DEBUG = "d";
   private CommandLine commandLine = null;
 
   /**
@@ -36,10 +37,11 @@ public class OptionsParser {
     // Parse command line option
     BasicParser parser = new BasicParser();
     Options options = new Options();
-    options.addOption(OPTION_KEY_INI_FILE, true, "setting file");
-    options.addOption(OPTION_KEY_INPUT_FILE, true, "input file");
-    options.addOption(OPTION_KEY_CHARA_SET, true,
-        "file character set(UTF-8,Shift-JIS,EUC-JP)");
+    options.addOption(OPTION_INI_FILE, true, "setting file");
+    options.addOption(OPTION_INPUT_FILE, true, "input file");
+    options.addOption(OPTION_CHARSET, true,
+        "file character set(UTF-8, Shift-JIS, EUC-JP)");
+    options.addOption(OPTION_DEBUG, false, "Print XML file");
 
     commandLine = parser.parse(options, args);
   }
@@ -50,7 +52,7 @@ public class OptionsParser {
    * @return -cオプションが存在する場合はtrue
    */
   public boolean hasPropertiesFileName() {
-    return commandLine.hasOption(OPTION_KEY_INI_FILE);
+    return commandLine.hasOption(OPTION_INI_FILE);
   }
 
   /**
@@ -59,7 +61,7 @@ public class OptionsParser {
    * @return java.lang.String 設定ファイル名
    */
   public String getPropertiesFileName() {
-    return getValue(OPTION_KEY_INI_FILE);
+    return getValue(OPTION_INI_FILE);
   }
 
   /**
@@ -68,7 +70,7 @@ public class OptionsParser {
    * @return -iオプションが存在する場合はtrue
    */
   public boolean hasInputFileName() {
-    return commandLine.hasOption(OPTION_KEY_INPUT_FILE);
+    return commandLine.hasOption(OPTION_INPUT_FILE);
   }
 
   /**
@@ -77,7 +79,7 @@ public class OptionsParser {
    * @return java.lang.String 入力ファイル名
    */
   public String getInputFileName() {
-    return getValue(OPTION_KEY_INPUT_FILE);
+    return getValue(OPTION_INPUT_FILE);
   }
 
   /**
@@ -86,7 +88,7 @@ public class OptionsParser {
    * @return -s オプションが存在する場合はtrue
    */
   public boolean hasCharactorSet() {
-    return commandLine.hasOption(OPTION_KEY_CHARA_SET);
+    return commandLine.hasOption(OPTION_CHARSET);
   }
 
   /**
@@ -95,7 +97,11 @@ public class OptionsParser {
    * @return java.lang.String 出力文字コード（UTF-8,Shift-JIS,EUC-JP）
    */
   public String getCharactorSet() {
-    return getValue(OPTION_KEY_CHARA_SET);
+    return getValue(OPTION_CHARSET);
+  }
+
+  public boolean isDebug() {
+    return commandLine.hasOption(OPTION_DEBUG);
   }
 
   private String getValue(String key) {

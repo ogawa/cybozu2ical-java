@@ -20,7 +20,7 @@ Edit "cybozu2ical.properties" so as to fit to your environment.
 Create an input file which specifies login name, start date, and end date.
 
     $ cat > input.csv
-    your-login-name,2011/06/01 00:00:00,2011/08/01 00:00:00
+    your-login-name,2011-06-01T00:00:00,2011-08-01T00:00:00
     ^D
 
 Run cybozu2ical.sh script.

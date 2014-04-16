@@ -223,7 +223,9 @@ public class Cybozu2iCal {
       }
 
       OMElement result = getEventsByTarget(client, loginID, span);
-      System.out.println(result.toString());
+      if (parser.isDebug()) {
+        System.out.println(result.toString());
+      }
       List<VEvent> eventList = createEventList(result);
 
       net.fortuna.ical4j.model.Calendar calendar = new net.fortuna.ical4j.model.Calendar();
@@ -239,7 +241,6 @@ public class Cybozu2iCal {
         String exportFile = exportDir + loginName + ".ics";
         FileOutputStream out = new FileOutputStream(exportFile);
         CalendarOutputter outputter = new CalendarOutputter();
-        // outputter.setValidating(false);
         outputter.output(calendar, out);
         logger.info("Created (" + exportFile + ")");
       } catch (IOException e) {
@@ -523,10 +524,11 @@ public class Cybozu2iCal {
       }
     }
 
+    Recur recur = null;
     String conditionType = (String) eventMap.get("condition.type");
     if (conditionType.equals("week")) {
       String conditionWeek = (String) eventMap.get("condition.week");
-      Recur recur = new Recur();
+      recur = new Recur();
       recur.setFrequency(Recur.WEEKLY);
       recur.setWeekStartDay(index2weekDay(conditionWeek).toString());
       if (eventMap.containsKey("condition.end_date")) {
@@ -536,13 +538,12 @@ public class Cybozu2iCal {
         }
         recur.setUntil(new net.fortuna.ical4j.model.Date(parseDate(endDate)));
       }
-      props.add(new RRule(recur));
     } else if (conditionType.equals("1stweek")
         || conditionType.equals("2ndweek") || conditionType.equals("3rdweek")
         || conditionType.equals("4thweek") || conditionType.equals("5thweek")) {
       int numOfWeek = Integer.parseInt(conditionType.substring(0, 1));
       String conditionWeek = (String) eventMap.get("condition.week");
-      Recur recur = new Recur();
+      recur = new Recur();
       recur.setFrequency(Recur.MONTHLY);
       recur.getDayList().add(
           new WeekDay(index2weekDay(conditionWeek), numOfWeek));
@@ -553,11 +554,9 @@ public class Cybozu2iCal {
         }
         recur.setUntil(new net.fortuna.ical4j.model.Date(parseDate(endDate)));
       }
-      props.add(new RRule(recur));
     } else if (conditionType.equals("month")) {
       String conditionDay = (String) eventMap.get("condition.day");
-      Recur recur = new Recur();
-      System.out.println("HELO");
+      recur = new Recur();
       recur.setFrequency(Recur.MONTHLY);
       recur.getMonthDayList().add(Integer.parseInt(conditionDay));
       if (eventMap.containsKey("condition.end_date")) {
@@ -567,6 +566,8 @@ public class Cybozu2iCal {
         }
         recur.setUntil(new net.fortuna.ical4j.model.Date(parseDate(endDate)));
       }
+    }
+    if (recur != null) {
       props.add(new RRule(recur));
     }
 
