@@ -1,4 +1,4 @@
-package office.api.main.cybozu2ical.util;
+package office.api.main.cybozu2ical;
 
 import org.apache.commons.cli.BasicParser;
 import org.apache.commons.cli.CommandLine;

@@ -25,8 +25,6 @@ import org.apache.axiom.om.OMElement;
 import org.apache.axis2.AxisFault;
 import org.apache.commons.httpclient.ConnectTimeoutException;
 
-import office.api.main.cybozu2ical.util.OptionsParser;
-import office.api.main.cybozu2ical.util.Config;
 
 import jp.co.joyzo.office.api.schedule.ScheduleGetEventsByTarget;
 import jp.co.joyzo.office.api.schedule.util.Span;
