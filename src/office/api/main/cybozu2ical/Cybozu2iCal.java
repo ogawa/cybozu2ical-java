@@ -7,15 +7,12 @@ import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.net.URI;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.TimeZone;
 import java.util.logging.Logger;
 
 import javax.xml.namespace.QName;
@@ -24,7 +21,6 @@ import org.apache.axiom.om.OMAttribute;
 import org.apache.axiom.om.OMElement;
 import org.apache.axis2.AxisFault;
 import org.apache.commons.httpclient.ConnectTimeoutException;
-
 
 import jp.co.joyzo.office.api.schedule.ScheduleGetEventsByTarget;
 import jp.co.joyzo.office.api.schedule.util.Span;
@@ -47,39 +43,6 @@ public class Cybozu2iCal {
   private static final String KEYITEM_NAME = "name";
 
   private static Logger logger = Logger.getLogger("cybozu2ical");
-
-  // 日付用ユーティリティ
-  private static final String DATETIME_FORMAT = "yyyy'-'MM'-'dd'T'HH':'mm':'ss'Z'";
-  private static SimpleDateFormat DATETIME_FORMATTER;
-  private static final String ALLDAY_FORMAT = "yyyy'-'MM'-'dd";
-  private static SimpleDateFormat ALLDAY_FORMATTER;
-  private static final String LOCAL_DATETIME_FORMAT = "yyyy'-'MM'-'dd'T'HH':'mm':'ss";
-  private static SimpleDateFormat LOCAL_DATETIME_FORMATTER;
-  static {
-    DATETIME_FORMATTER = new SimpleDateFormat(DATETIME_FORMAT);
-    DATETIME_FORMATTER.setTimeZone(TimeZone.getTimeZone("UTC"));
-    ALLDAY_FORMATTER = new SimpleDateFormat(ALLDAY_FORMAT);
-    ALLDAY_FORMATTER.setTimeZone(TimeZone.getTimeZone("UTC"));
-    LOCAL_DATETIME_FORMATTER = new SimpleDateFormat(LOCAL_DATETIME_FORMAT);
-  }
-
-  private static Date parseDate(String str) {
-    Date date = null;
-    try {
-      date = DATETIME_FORMATTER.parse(str);
-    } catch (ParseException pe) {
-      try {
-        date = LOCAL_DATETIME_FORMATTER.parse(str);
-      } catch (ParseException pe1) {
-        try {
-          date = ALLDAY_FORMATTER.parse(str);
-        } catch (ParseException pe2) {
-          logger.warning("incorrect date format: " + pe2.getMessage());
-        }
-      }
-    }
-    return date;
-  }
 
   private static String uidFormat = "%s@";
 
@@ -211,11 +174,11 @@ public class Cybozu2iCal {
 
       // generate span for getEventsByTarget
       Span span = new Span();
-      Date spanStart = parseDate(startDate);
+      Date spanStart = DateHelper.parseDate(startDate);
       if (spanStart != null) {
         span.setStart(spanStart);
       }
-      Date spanEnd = parseDate(endDate);
+      Date spanEnd = DateHelper.parseDate(endDate);
       if (spanEnd != null) {
         span.setEnd(spanEnd);
       }
@@ -534,7 +497,7 @@ public class Cybozu2iCal {
         if (eventMap.containsKey("condition.end_time")) {
           endDate += "T" + eventMap.get("condition.end_time");
         }
-        recur.setUntil(new net.fortuna.ical4j.model.Date(parseDate(endDate)));
+        recur.setUntil(new net.fortuna.ical4j.model.Date(DateHelper.parseDate(endDate)));
       }
     } else if (conditionType.equals("1stweek")
         || conditionType.equals("2ndweek") || conditionType.equals("3rdweek")
@@ -550,7 +513,7 @@ public class Cybozu2iCal {
         if (eventMap.containsKey("condition.end_time")) {
           endDate += "T" + eventMap.get("condition.end_time");
         }
-        recur.setUntil(new net.fortuna.ical4j.model.Date(parseDate(endDate)));
+        recur.setUntil(new net.fortuna.ical4j.model.Date(DateHelper.parseDate(endDate)));
       }
     } else if (conditionType.equals("month")) {
       String conditionDay = (String) eventMap.get("condition.day");
@@ -562,7 +525,7 @@ public class Cybozu2iCal {
         if (eventMap.containsKey("condition.end_time")) {
           endDate += "T" + eventMap.get("condition.end_time");
         }
-        recur.setUntil(new net.fortuna.ical4j.model.Date(parseDate(endDate)));
+        recur.setUntil(new net.fortuna.ical4j.model.Date(DateHelper.parseDate(endDate)));
       }
     }
     if (recur != null) {
@@ -667,7 +630,7 @@ public class Cybozu2iCal {
           OMAttribute attr = (OMAttribute) datetimeAttrIter.next();
           String attrName = attr.getLocalName();
           String attrValue = attr.getAttributeValue();
-          Date date = parseDate(attrValue);
+          Date date = DateHelper.parseDate(attrValue);
           if (date != null) {
             eventMap.put(attrName, date);
           }
@@ -708,11 +671,11 @@ public class Cybozu2iCal {
               end += "T" + end_time;
             }
           }
-          Date startDate = parseDate(start);
+          Date startDate = DateHelper.parseDate(start);
           if (startDate != null) {
             eventMap.put("condition.start", startDate);
           }
-          Date endDate = parseDate(end);
+          Date endDate = DateHelper.parseDate(end);
           if (endDate != null) {
             eventMap.put("condition.end", endDate);
           }
@@ -738,9 +701,9 @@ public class Cybozu2iCal {
             String attrValue = attr.getAttributeValue();
             attrValue = attrValue.substring(0, 10);
             if (attrName.equals("start")) {
-              exclusiveDatesStart.add(parseDate(attrValue));
+              exclusiveDatesStart.add(DateHelper.parseDate(attrValue));
             } else if (attrName.equals("end")) {
-              exclusiveDatesEnd.add(parseDate(attrValue));
+              exclusiveDatesEnd.add(DateHelper.parseDate(attrValue));
             }
           }
         }
