@@ -1,8 +1,6 @@
 package office.api.main.cybozu2ical;
 
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
@@ -20,27 +18,19 @@ import javax.xml.namespace.QName;
 import org.apache.axiom.om.OMAttribute;
 import org.apache.axiom.om.OMElement;
 import org.apache.axis2.AxisFault;
-import org.apache.commons.httpclient.ConnectTimeoutException;
-
-import jp.co.joyzo.office.api.schedule.ScheduleGetEventsByTarget;
-import jp.co.joyzo.office.api.schedule.util.Span;
-import jp.co.joyzo.office.api.base.BaseGetUsersByLoginName;
-import jp.co.joyzo.office.api.common.CBServiceClient;
+import org.apache.commons.cli.ParseException;
 
 import net.fortuna.ical4j.data.CalendarOutputter;
 import net.fortuna.ical4j.model.PropertyList;
 import net.fortuna.ical4j.model.Recur;
 import net.fortuna.ical4j.model.ValidationException;
 import net.fortuna.ical4j.model.WeekDay;
+
 import net.fortuna.ical4j.model.DateList;
 import net.fortuna.ical4j.model.component.VEvent;
 import net.fortuna.ical4j.model.property.*;
 
 public class Cybozu2iCal {
-
-  // ユーザーを識別する項目
-  private static final String KEYITEM_ID = "id";
-  private static final String KEYITEM_NAME = "name";
 
   private static Logger logger = Logger.getLogger("cybozu2ical");
 
@@ -67,9 +57,8 @@ public class Cybozu2iCal {
     OptionsParser parser = null;
     try {
       parser = new OptionsParser(args);
-    } catch (org.apache.commons.cli.ParseException e) {
-      logger.severe(e.getMessage());
-      return;
+    } catch (ParseException e1) {
+      e1.printStackTrace();
     }
 
     // プロパティファイル名の取得
@@ -89,37 +78,28 @@ public class Cybozu2iCal {
     Config config = null;
     try {
       config = new Config(propertiesFile);
-      if (!checkConfig(config)) {
-        return;
-      }
-    } catch (FileNotFoundException e) {
-      logger.severe(e.getMessage());
-      return;
-    } catch (IOException e) {
-      logger.severe(e.getMessage());
+    } catch (IOException e1) {
+      e1.printStackTrace();
+    }
+    if (!checkConfig(config)) {
       return;
     }
+    logger.info("Finished reading a property file");
 
     URI url = config.getOfficeURL();
     uidFormat = "%s@" + url.getHost();
 
-    logger.info("Finished reading a property file");
-
     String exportDir = config.getExportDir();
     if (!exportDir.substring(exportDir.length() - sysFileSeparator.length())
-        .equals(sysFileSeparator))
+        .equals(sysFileSeparator)) {
       exportDir += sysFileSeparator;
-
-    File dir = new File(exportDir);
-    if (!dir.exists()) {
-      logger.severe("Cannot find (" + exportDir + ")");
-      return;
     }
 
     // CSVファイルの読み込み
     List<String> inputDataList = new ArrayList<String>();
     try {
-      BufferedReader reader = new BufferedReader(new FileReader(inputFile));
+      BufferedReader reader;
+      reader = new BufferedReader(new FileReader(inputFile));
       logger.info("Open file (" + inputFile + ")");
       String line;
       while ((line = reader.readLine()) != null) {
@@ -127,22 +107,19 @@ public class Cybozu2iCal {
       }
       reader.close();
       logger.info("Close file (" + inputFile + ")");
-    } catch (FileNotFoundException e) {
-      logger.severe(e.getMessage());
-      return;
-    } catch (IOException e) {
-      logger.severe(e.getMessage());
+    } catch (IOException e1) {
+      e1.printStackTrace();
       return;
     }
 
     // SOAPクライアントのオブジェクト生成
-    CBServiceClient client;
+    CBClient client;
     try {
-      client = new CBServiceClient();
+      client = new CBClient();
       client.load(config.getOfficeURL(), config.getUsername(),
           config.getPassword());
     } catch (AxisFault e) {
-      logger.severe(e.getMessage());
+      e.printStackTrace();
       return;
     }
 
@@ -163,8 +140,8 @@ public class Cybozu2iCal {
 
       // generate loginID for getEventsByTarget
       String loginID;
-      if (config.getKeyItem().trim().equals(KEYITEM_NAME)) {
-        loginID = getLoginIDByLoginName(client, columns[0]);
+      if (config.getKeyItem().trim().equals(CBClient.KEYITEM_NAME)) {
+        loginID = client.getLoginIDByLoginName(columns[0]);
       } else {
         loginID = columns[0];
       }
@@ -172,20 +149,10 @@ public class Cybozu2iCal {
         continue;
       }
 
-      // generate span for getEventsByTarget
-      Span span = new Span();
-      Date spanStart = DateHelper.parseDate(startDate);
-      if (spanStart != null) {
-        span.setStart(spanStart);
-      }
-      Date spanEnd = DateHelper.parseDate(endDate);
-      if (spanEnd != null) {
-        span.setEnd(spanEnd);
-      }
-
-      OMElement result = getEventsByTarget(client, loginID, span);
+      OMElement result = client.getEventsByTarget(loginID,
+          DateHelper.parseDate(startDate), DateHelper.parseDate(endDate));
       if (parser.isDebug()) {
-        System.out.println(result.toString());
+        System.out.println(result);
       }
       List<VEvent> eventList = createEventList(result);
 
@@ -198,20 +165,16 @@ public class Cybozu2iCal {
         calendar.getComponents().add(eventIter.next());
       }
 
+      String exportFile = exportDir + loginName + ".ics";
+      CalendarOutputter outputter = new CalendarOutputter();
       try {
-        String exportFile = exportDir + loginName + ".ics";
         FileOutputStream out = new FileOutputStream(exportFile);
-        CalendarOutputter outputter = new CalendarOutputter();
         outputter.output(calendar, out);
-        logger.info("Created (" + exportFile + ")");
-      } catch (IOException e) {
-        logger.severe(e.getMessage());
-        return;
-      } catch (ValidationException e) {
-        // TODO Auto-generated catch block
+      } catch (IOException | ValidationException e) {
         e.printStackTrace();
+        return;
       }
-
+      logger.info("Created (" + exportFile + ")");
       logger.info("End Processing: " + data);
       succeeded++;
     }
@@ -256,7 +219,8 @@ public class Cybozu2iCal {
       logger.severe(createErrMsg(Config.ConfigKeys.KEYITEM.getKey()));
       success = false;
     } else { // 設定値が「id」、「name」以外の場合
-      if (!keyitem.equals(KEYITEM_ID) && !keyitem.equals(KEYITEM_NAME)) {
+      if (!keyitem.equals(CBClient.KEYITEM_ID)
+          && !keyitem.equals(CBClient.KEYITEM_NAME)) {
         logger.severe(createErrMsg(Config.ConfigKeys.KEYITEM.getKey()));
         success = false;
       }
@@ -281,97 +245,57 @@ public class Cybozu2iCal {
     return "Value is not set correctly for " + data + " in properties file";
   }
 
-  /**
-   * loginNameをloginIDに変換します。
-   * 
-   * @param client
-   *          サイボウズOfficeのクライアントオブジェクト
-   * @param loginName
-   *          ログイン名
-   * @return ログインID
-   */
-  private static String getLoginIDByLoginName(CBServiceClient client,
-      String loginName) {
-
-    BaseGetUsersByLoginName action = new BaseGetUsersByLoginName();
-    action.addLoginName(loginName);
-
-    String loginID = null;
-    try {
-      OMElement result = client.sendReceive(action);
-      if (result != null) {
-        OMElement user = result.getFirstElement().getFirstElement();
-        loginID = user.getAttributeValue(new QName("key"));
-      }
-    } catch (ConnectTimeoutException e) {
-      logger.severe(e.getMessage());
-    } catch (AxisFault ae) {
-      OMElement errCode = ae.getDetail();
-      if (errCode != null) {
-        if (errCode.getText().equals("19106")) {
-          logger.severe("19106: Wrong login name (" + loginName + ")");
-        } else if (errCode.getText().equals("19108")) {
-          logger.severe("19108: Wrong login name or password");
-        } else {
-          logger.severe(errCode + ": " + loginName);
-        }
-      } else {
-        logger.severe(loginName + ": " + ae.getMessage());
-      }
-    } catch (Throwable t) {
-      logger.severe(t.getMessage());
-    }
-
-    return loginID;
-  }
-
-  /**
-   * ユーザのスケジュールデータを取得します。
-   * 
-   * @param client
-   *          サイボウズOfficeのクライアントオブジェクト
-   * @param loginID
-   *          ログインID
-   * @param span
-   *          日時の範囲
-   * @return ユーザのスケジュールデータ
-   */
-  private static OMElement getEventsByTarget(CBServiceClient client,
-      String loginID, Span span) {
-
-    ScheduleGetEventsByTarget action = new ScheduleGetEventsByTarget();
-    action.setSpan(span);
-    action.addUserID(loginID);
-
-    OMElement result = null;
-    try {
-      result = client.sendReceive(action);
-    } catch (ConnectTimeoutException e) {
-      logger.severe(e.getMessage());
-    } catch (AxisFault ae) {
-      OMElement errCode = ae.getDetail();
-      if (errCode != null) {
-        if (errCode.getText().equals("19108")) {
-          logger.severe("19108: Wrong login name or password");
-        } else {
-          logger.severe(errCode + ": " + loginID);
-        }
-      } else {
-        logger.severe(loginID + ": " + ae.getMessage());
-      }
-    } catch (Throwable t) {
-      logger.severe(t.getMessage());
-    }
-
-    return result;
-  }
-
   static WeekDay[] weekDays = { WeekDay.MO, WeekDay.TU, WeekDay.WE, WeekDay.TH,
       WeekDay.FR, WeekDay.SA, WeekDay.SU };
 
   private static WeekDay index2weekDay(String week) {
     int index = Integer.parseInt(week) - 1;
     return weekDays[index];
+  }
+
+  private static VEvent createVEvent(OMElement event) {
+    HashMap<String, Object> eventMap = parseScheduleEvent(event);
+
+    PropertyList props = new PropertyList();
+
+    if (eventMap.containsKey("id")) {
+      props.add(new Uid(String.format(uidFormat, (String) eventMap.get("id"))));
+    }
+    props.add(new DtStamp());
+
+    if (eventMap.containsKey("event_type")) {
+      String eventType = (String) eventMap.get("event_type");
+      if (eventType.equals("normal")) {
+        if (eventMap.containsKey("allday")
+            && eventMap.get("allday").equals("true")) {
+          createNormalAllDayEvent(props, eventMap);
+        } else {
+          createNormalEvent(props, eventMap);
+        }
+      } else if (eventType.equals("repeat")) {
+        if (eventMap.containsKey("allday")
+            && eventMap.get("allday").equals("true")) {
+          createRepeatedAllDayEvent(props, eventMap);
+        } else {
+          createRepeatedEvent(props, eventMap);
+        }
+      } else if (eventType.equals("banner")) {
+        createBannerEvent(props, eventMap);
+      }
+    }
+
+    if (eventMap.containsKey("detail")) {
+      props.add(new Summary((String) eventMap.get("detail")));
+    }
+    if (eventMap.containsKey("description")) {
+      props.add(new Description((String) eventMap.get("description")));
+    }
+    if (eventMap.containsKey("location")) {
+      props.add(new Location((String) eventMap.get("location")));
+    }
+
+    VEvent vevent = new VEvent(props);
+    return vevent;
   }
 
   /**
@@ -383,71 +307,29 @@ public class Cybozu2iCal {
    * 
    */
   private static List<VEvent> createEventList(OMElement node) {
-
-    HashMap<String, VEvent> eventsMap = new HashMap<String, VEvent>();
+    HashMap<String, VEvent> veventsMap = new HashMap<String, VEvent>();
 
     Iterator<?> eventIter = node.getFirstElement().getChildrenWithLocalName(
         "schedule_event");
     while (eventIter.hasNext()) {
       OMElement event = (OMElement) eventIter.next();
-      HashMap<String, Object> eventMap = parseScheduleEvent(event);
+      VEvent vevent = createVEvent(event);
 
-      PropertyList props = new PropertyList();
-
-      if (eventMap.containsKey("id")) {
-        props
-            .add(new Uid(String.format(uidFormat, (String) eventMap.get("id"))));
-      }
-      props.add(new DtStamp());
-
-      if (eventMap.containsKey("event_type")) {
-        String eventType = (String) eventMap.get("event_type");
-        if (eventType.equals("normal")) {
-          if (eventMap.containsKey("allday")
-              && eventMap.get("allday").equals("true")) {
-            createNormalAllDayEvent(props, eventMap);
-          } else {
-            createNormalEvent(props, eventMap);
-          }
-        } else if (eventType.equals("repeat")) {
-          if (eventMap.containsKey("allday")
-              && eventMap.get("allday").equals("true")) {
-            createRepeatedAllDayEvent(props, eventMap);
-          } else {
-            createRepeatedEvent(props, eventMap);
-          }
-        } else if (eventType.equals("banner")) {
-          createBannerEvent(props, eventMap);
-        }
-      }
-
-      if (eventMap.containsKey("detail")) {
-        props.add(new Summary((String) eventMap.get("detail")));
-      }
-      if (eventMap.containsKey("description")) {
-        props.add(new Description((String) eventMap.get("description")));
-      }
-      if (eventMap.containsKey("location")) {
-        props.add(new Location((String) eventMap.get("location")));
-      }
-
-      VEvent vevent = new VEvent(props);
-
-      String key = String.format(uidFormat, (String) eventMap.get("id"));
-      if (eventsMap.containsKey(key)) {
-        VEvent value = eventsMap.get(key);
-        String prevDate = value.getStartDate().getValue();
-        String currentDate = vevent.getStartDate().getValue();
-        if (currentDate.compareTo(prevDate) < 0) {
-          eventsMap.put(key, vevent);
+      String uid = vevent.getUid().getValue();
+      String startDate = vevent.getStartDate().getValue();
+      if (veventsMap.containsKey(uid)) {
+        VEvent prevVEvent = veventsMap.get(uid);
+        String prevStartDate = prevVEvent.getStartDate().getValue();
+        if (startDate.compareTo(prevStartDate) < 0) {
+          veventsMap.put(uid, vevent);
         }
       } else {
-        eventsMap.put(key, vevent);
+        veventsMap.put(uid, vevent);
       }
     }
 
     List<VEvent> eventList = new ArrayList<VEvent>();
-    for (VEvent vevent : eventsMap.values()) {
+    for (VEvent vevent : veventsMap.values()) {
       eventList.add(vevent);
     }
     return eventList;
@@ -497,7 +379,8 @@ public class Cybozu2iCal {
         if (eventMap.containsKey("condition.end_time")) {
           endDate += "T" + eventMap.get("condition.end_time");
         }
-        recur.setUntil(new net.fortuna.ical4j.model.Date(DateHelper.parseDate(endDate)));
+        recur.setUntil(new net.fortuna.ical4j.model.Date(DateHelper
+            .parseDate(endDate)));
       }
     } else if (conditionType.equals("1stweek")
         || conditionType.equals("2ndweek") || conditionType.equals("3rdweek")
@@ -513,7 +396,8 @@ public class Cybozu2iCal {
         if (eventMap.containsKey("condition.end_time")) {
           endDate += "T" + eventMap.get("condition.end_time");
         }
-        recur.setUntil(new net.fortuna.ical4j.model.Date(DateHelper.parseDate(endDate)));
+        recur.setUntil(new net.fortuna.ical4j.model.Date(DateHelper
+            .parseDate(endDate)));
       }
     } else if (conditionType.equals("month")) {
       String conditionDay = (String) eventMap.get("condition.day");
@@ -525,7 +409,8 @@ public class Cybozu2iCal {
         if (eventMap.containsKey("condition.end_time")) {
           endDate += "T" + eventMap.get("condition.end_time");
         }
-        recur.setUntil(new net.fortuna.ical4j.model.Date(DateHelper.parseDate(endDate)));
+        recur.setUntil(new net.fortuna.ical4j.model.Date(DateHelper
+            .parseDate(endDate)));
       }
     }
     if (recur != null) {
@@ -535,15 +420,23 @@ public class Cybozu2iCal {
     if (eventMap.containsKey("exclusiveDates.start")) {
       @SuppressWarnings("unchecked")
       List<Date> dates = (List<Date>) eventMap.get("exclusiveDates.start");
-      DateList dateList = new DateList();
+      // generate multiple EXDATEs for avoiding iCal.app bug
       for (Date date : dates) {
+        DateList dateList = new DateList();
         dateList.add(new net.fortuna.ical4j.model.Date(date));
-      }
-      if (!dateList.isEmpty()) {
         dateList = new DateList(dateList,
             net.fortuna.ical4j.model.parameter.Value.DATE);
         props.add(new ExDate(dateList));
       }
+      // DateList dateList = new DateList();
+      // for (Date date : dates) {
+      // dateList.add(new net.fortuna.ical4j.model.Date(date));
+      // }
+      // if (!dateList.isEmpty()) {
+      // dateList = new DateList(dateList,
+      // net.fortuna.ical4j.model.parameter.Value.DATE);
+      // props.add(new ExDate(dateList));
+      // }
     }
   }
 
