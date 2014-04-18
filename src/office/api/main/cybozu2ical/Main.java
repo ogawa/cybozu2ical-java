@@ -6,8 +6,6 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.logging.Logger;
 
@@ -17,10 +15,8 @@ import org.apache.commons.cli.ParseException;
 
 import net.fortuna.ical4j.data.CalendarOutputter;
 import net.fortuna.ical4j.model.ValidationException;
-import net.fortuna.ical4j.model.component.VEvent;
-import net.fortuna.ical4j.model.property.*;
 
-public class Cybozu2iCal {
+public class Main {
 
   private static Logger logger = Logger.getLogger("cybozu2ical");
 
