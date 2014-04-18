@@ -3,4 +3,5 @@
 /cybozu2ical.jar
 /*.properties
 /*.csv
+/*.ics
 .DS_Store
