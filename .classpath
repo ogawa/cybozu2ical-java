@@ -5,5 +5,6 @@
 	<classpathentry kind="lib" path="lib/commons-cli-1.2.jar"/>
 	<classpathentry kind="lib" path="lib/ical4j-1.0.5.jar"/>
 	<classpathentry kind="lib" path="lib/officeapi.jar"/>
+	<classpathentry kind="lib" path="lib/backport-util-concurrent-3.1.jar"/>
 	<classpathentry kind="output" path="build"/>
 </classpath>

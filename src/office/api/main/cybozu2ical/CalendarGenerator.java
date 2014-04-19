@@ -17,14 +17,14 @@ public class CalendarGenerator {
   private String prodId = null;
   private OMElement node = null;
   net.fortuna.ical4j.model.Calendar calendar = null;
-  
+
   public CalendarGenerator(OMElement node, String prodId, String format) {
     this.setNode(node);
     this.setProdId(prodId);
     this.setUidFormat(format);
     this.generateCalendar();
   }
-  
+
   public net.fortuna.ical4j.model.Calendar getCalendar() {
     return calendar;
   }
@@ -36,18 +36,23 @@ public class CalendarGenerator {
   public String getUidFormat() {
     return uidFormat;
   }
+
   public void setUidFormat(String uidFormat) {
     this.uidFormat = uidFormat;
   }
+
   public String getProdId() {
     return prodId;
   }
+
   public void setProdId(String prodId) {
     this.prodId = prodId;
   }
+
   public OMElement getNode() {
     return node;
   }
+
   public void setNode(OMElement node) {
     this.node = node;
   }
@@ -65,7 +70,7 @@ public class CalendarGenerator {
     }
     this.setCalendar(calendar);
   }
-  
+
   /**
    * SOAPで取得したデータからイベントデータのリストを作成します
    * 

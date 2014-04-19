@@ -11,6 +11,10 @@ import java.util.logging.Logger;
 
 import org.apache.axiom.om.OMElement;
 import org.apache.axis2.AxisFault;
+import org.apache.commons.cli.BasicParser;
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 
 import net.fortuna.ical4j.data.CalendarOutputter;
@@ -32,73 +36,68 @@ public class Main {
    *          オプション
    */
   public static void main(String[] args) {
-    logger.info("Begin processing");
 
-    // プロパティファイルの読み込み
-    String propertiesFile = sysUserDir + sysFileSeparator
-        + "cybozu2ical.properties";
-    String inputFile = "";
+    Options options = new Options();
+    options.addOption("c", "config", true, "use given config file");
+    options.addOption("i", "input", true, "use given input file [MANDATORY]");
+    options.addOption("d", "debug", false, "print debugging information");
+    options.addOption("h", "help", false, "print this message");
+    BasicParser parser = new BasicParser();
+    CommandLine cmd = null;
 
-    // 引数チェック
-    OptionsParser parser = null;
     try {
-      parser = new OptionsParser(args);
-    } catch (ParseException e1) {
-      e1.printStackTrace();
-    }
-
-    // プロパティファイル名の取得
-    if (parser.hasPropertiesFileName())
-      propertiesFile = parser.getPropertiesFileName();
-
-    // 登録用CSVファイル名の取得
-    if (parser.hasInputFileName())
-      inputFile = parser.getInputFileName();
-    else {
-      logger.severe("Missing -i option");
+      cmd = parser.parse(options, args);
+    } catch (ParseException e) {
+      printHelp(options);
       return;
     }
 
-    // プロパティファイルの読み込み
-    logger.info("Reading a property file");
+    if (cmd.hasOption("help") || !cmd.hasOption("input")) {
+      printHelp(options);
+      return;
+    }
+
+    // config file
+    String configFile = sysUserDir + sysFileSeparator
+        + "cybozu2ical.properties";
+    if (cmd.hasOption("config")) {
+      configFile = cmd.getOptionValue("config");
+    }
     Config config = null;
     try {
-      config = new Config(propertiesFile);
-    } catch (IOException e1) {
-      e1.printStackTrace();
+      config = new Config(configFile);
+    } catch (IOException e) {
+      e.printStackTrace();
+      return;
     }
     if (!checkConfig(config)) {
       return;
     }
-    logger.info("Finished reading a property file");
 
-    URI url = config.getOfficeURL();
-    uidFormat = "%s@" + url.getHost();
+    // input file
+    String inputFile = cmd.getOptionValue("input");
+    List<String> inputDataList = new ArrayList<String>();
+    try {
+      BufferedReader reader = new BufferedReader(new FileReader(inputFile));
+      String line;
+      while ((line = reader.readLine()) != null) {
+        inputDataList.add(line);
+      }
+      reader.close();
+    } catch (IOException e) {
+      e.printStackTrace();
+      return;
+    }
 
+    // other common variables
+    uidFormat = "%s@" + config.getOfficeURL().getHost();
     String exportDir = config.getExportDir();
     if (!exportDir.substring(exportDir.length() - sysFileSeparator.length())
         .equals(sysFileSeparator)) {
       exportDir += sysFileSeparator;
     }
 
-    // CSVファイルの読み込み
-    List<String> inputDataList = new ArrayList<String>();
-    try {
-      BufferedReader reader;
-      reader = new BufferedReader(new FileReader(inputFile));
-      logger.info("Open file (" + inputFile + ")");
-      String line;
-      while ((line = reader.readLine()) != null) {
-        inputDataList.add(line);
-      }
-      reader.close();
-      logger.info("Close file (" + inputFile + ")");
-    } catch (IOException e1) {
-      e1.printStackTrace();
-      return;
-    }
-
-    // SOAPクライアントのオブジェクト生成
+    // generate SOAP client
     CBClient client;
     try {
       client = new CBClient();
@@ -114,7 +113,6 @@ public class Main {
       logger.info("Begin Processing: " + data);
 
       String[] columns = data.split(",");
-
       if (columns.length < 3) {
         logger.warning("Insufficient number of items: " + data);
         continue;
@@ -137,10 +135,11 @@ public class Main {
 
       OMElement node = client.getEventsByTarget(loginID,
           DateHelper.parseDate(startDate), DateHelper.parseDate(endDate));
-      if (parser.isDebug()) {
+      if (cmd.hasOption("debug")) {
         System.out.println(node);
       }
-      CalendarGenerator generator = new CalendarGenerator(node, "cybozu2ical-java/0.01", uidFormat);
+      CalendarGenerator generator = new CalendarGenerator(node,
+          "cybozu2ical-java/0.01", uidFormat);
       net.fortuna.ical4j.model.Calendar calendar = generator.getCalendar();
 
       String exportFile = exportDir + loginName + ".ics";
@@ -160,6 +159,11 @@ public class Main {
     int total = inputDataList.size();
     logger.info("End Processing (total:" + total + " succeeded:" + succeeded
         + " failed:" + (total - succeeded) + ")");
+  }
+
+  private static void printHelp(Options options) {
+    HelpFormatter formatter = new HelpFormatter();
+    formatter.printHelp("cybozu2ical [options]", options);
   }
 
   /**
