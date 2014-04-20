@@ -18,6 +18,8 @@ import net.fortuna.ical4j.data.CalendarOutputter;
 import net.fortuna.ical4j.model.ValidationException;
 
 public class Main {
+  public static final String PRODID = "cybozu2ical-java/0.01";
+  public static final String CONFIGFILE = "cybozu2ical.properties";
 
   private static Logger logger = Logger.getLogger("cybozu2ical");
 
@@ -52,6 +54,10 @@ public class Main {
     Date spanEnd = null;
     if (cmd.hasOption("start")) {
       spanStart = DateHelper.parseDate(cmd.getOptionValue("start"));
+      if (spanStart == null) {
+        printHelp(options);
+        return;
+      }
     }
     if (spanStart == null) {
       Calendar cal = Calendar.getInstance();
@@ -60,6 +66,10 @@ public class Main {
     }
     if (cmd.hasOption("end")) {
       spanEnd = DateHelper.parseDate(cmd.getOptionValue("end"));
+      if (spanEnd == null) {
+        printHelp(options);
+        return;
+      }
     }
     if (spanEnd == null) {
       Calendar cal = Calendar.getInstance();
@@ -82,8 +92,9 @@ public class Main {
     } catch (IOException e) {
       e.printStackTrace();
     }
-    if (!checkConfig(config))
+    if (!checkConfig(config)) {
       return;
+    }
 
     // other common variables
     String uidFormat = "%s@" + config.getOfficeURL().getHost();
@@ -114,8 +125,7 @@ public class Main {
     if (cmd.hasOption("debug")) {
       System.out.println(node);
     }
-    CalendarGenerator generator = new CalendarGenerator(node,
-        "cybozu2ical-java/0.01", uidFormat);
+    CalendarGenerator generator = new CalendarGenerator(node, PRODID, uidFormat);
     net.fortuna.ical4j.model.Calendar calendar = generator.getCalendar();
 
     // output calendar
@@ -139,8 +149,8 @@ public class Main {
     options.addOption("o", "output", true, "use given output file");
     options.addOption("u", "user", true,
         "use given user login name or id [MANDATORY]");
-    options.addOption("s", "start", true, "use given start date [YYYY-mm-dd]");
-    options.addOption("e", "end", true, "use given end date [YYYY-mm-dd]");
+    options.addOption("s", "start", true, "use given start date (YYYY-mm-dd)");
+    options.addOption("e", "end", true, "use given end date (YYYY-mm-dd)");
     options.addOption("d", "debug", false, "print debugging information");
     options.addOption("h", "help", false, "print this message");
     return options;
@@ -170,13 +180,13 @@ public class Main {
       configFile = cmd.getOptionValue("config");
     } else {
       configFile = System.getProperty("user.dir")
-          + System.getProperty("file.separator") + "cybozu2ical.properties";
+          + System.getProperty("file.separator") + CONFIGFILE;
     }
     return new Config(configFile);
   }
 
   /**
-   * propertiesファイルの内容をチェックする。必須漏れや形式間違いがある場合はfalseを返す。
+   * propertiesファイルの内容をチェックする。
    * 
    * @param config
    *          propertiesファイル情報
