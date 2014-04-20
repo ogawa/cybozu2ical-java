@@ -2,7 +2,6 @@ package office.api.main.cybozu2ical;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.net.URI;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.logging.Logger;
@@ -30,18 +29,10 @@ public class Main {
    */
   public static void main(String[] args) {
 
-    Options options = new Options();
-    options.addOption("c", "config", true, "use given config file");
-    options.addOption("o", "output", true, "use given output file");
-    options.addOption("u", "user", true,
-        "use given user login name or id [MANDATORY]");
-    options.addOption("s", "start", true, "use given start date [YYYY-mm-dd]");
-    options.addOption("e", "end", true, "use given end date [YYYY-mm-dd]");
-    options.addOption("d", "debug", false, "print debugging information");
-    options.addOption("h", "help", false, "print this message");
+    // options, cmd
+    Options options = getOptions();
     BasicParser parser = new BasicParser();
     CommandLine cmd = null;
-
     try {
       cmd = parser.parse(options, args);
     } catch (ParseException e) {
@@ -81,18 +72,11 @@ public class Main {
       calendarFile = cmd.getOptionValue("user") + ".ics";
 
     // config file
-    String configFile = null;
-    if (cmd.hasOption("config"))
-      configFile = cmd.getOptionValue("config");
-    else
-      configFile = System.getProperty("user.dir")
-          + System.getProperty("file.separator") + "cybozu2ical.properties";
     Config config = null;
     try {
-      config = new Config(configFile);
+      config = getConfig(cmd);
     } catch (IOException e) {
       e.printStackTrace();
-      return;
     }
     if (!checkConfig(config))
       return;
@@ -114,7 +98,7 @@ public class Main {
     // loginName, loginID
     String loginName = cmd.getOptionValue("user");
     String loginID = null;
-    if (config.getKeyItem().trim().equals(CBClient.KEYITEM_NAME)) {
+    if (config.getKeyitem().equals(CBClient.KEYITEM_NAME)) {
       loginID = client.getLoginIDByLoginName(loginName);
     } else {
       loginID = loginName;
@@ -139,10 +123,25 @@ public class Main {
       outputter.output(calendar, out);
     } catch (IOException | ValidationException e) {
       e.printStackTrace();
-      return;
     }
-    logger.info("Created (" + calendarFile + ")");
+  }
 
+  /**
+   * Optionsを生成する。
+   * 
+   * @return options org.apache.commons.cli.Options
+   */
+  private static Options getOptions() {
+    Options options = new Options();
+    options.addOption("c", "config", true, "use given config file");
+    options.addOption("o", "output", true, "use given output file");
+    options.addOption("u", "user", true,
+        "use given user login name or id [MANDATORY]");
+    options.addOption("s", "start", true, "use given start date [YYYY-mm-dd]");
+    options.addOption("e", "end", true, "use given end date [YYYY-mm-dd]");
+    options.addOption("d", "debug", false, "print debugging information");
+    options.addOption("h", "help", false, "print this message");
+    return options;
   }
 
   /**
@@ -157,6 +156,23 @@ public class Main {
   }
 
   /**
+   * Configを生成する。
+   * 
+   * @param cmd
+   *          CommandLine
+   * @return config Config
+   */
+  private static Config getConfig(CommandLine cmd) throws IOException {
+    String configFile = null;
+    if (cmd.hasOption("config"))
+      configFile = cmd.getOptionValue("config");
+    else
+      configFile = System.getProperty("user.dir")
+          + System.getProperty("file.separator") + "cybozu2ical.properties";
+    return new Config(configFile);
+  }
+
+  /**
    * propertiesファイルの内容をチェックする。必須漏れや形式間違いがある場合はfalseを返す。
    * 
    * @param config
@@ -164,39 +180,23 @@ public class Main {
    * @return エラーの有無
    */
   private static boolean checkConfig(Config config) {
-    boolean success = true;
-
-    URI uri = config.getOfficeURL();
-    String username = config.getUsername();
-    String password = config.getPassword();
-    String keyitem = config.getKeyItem();
-
-    if (uri == null || uri.toString().trim().equals("")) {
-      logger.severe("Invalid " + Config.ConfigKeys.OFFICEURL.getKey());
-      success = false;
+    boolean failed = false;
+    if (config.getOfficeURL() == null) {
+      logger.severe("invalid or empty property: officeURL");
+      failed = true;
     }
-
-    if (username == null || username.trim().equals("")) {
-      logger.severe("Invalid " + Config.ConfigKeys.USERNAME.getKey());
-      success = false;
+    if (config.getUsername() == null) {
+      logger.severe("invalid or empty property: username");
+      failed = true;
     }
-
-    if (password == null) {
-      logger.severe("Invalid " + Config.ConfigKeys.PASSWORD.getKey());
-      success = false;
+    if (config.getPassword() == null) {
+      logger.severe("invalid or empty property: password");
+      failed = true;
     }
-
-    if (keyitem == null) {
-      logger.severe("Invalid " + Config.ConfigKeys.KEYITEM.getKey());
-      success = false;
-    } else { // 設定値が「id」、「name」以外の場合
-      if (!keyitem.equals(CBClient.KEYITEM_ID)
-          && !keyitem.equals(CBClient.KEYITEM_NAME)) {
-        logger.severe("Invalid " + Config.ConfigKeys.KEYITEM.getKey());
-        success = false;
-      }
+    if (config.getKeyitem() == null) {
+      logger.severe("invalid or empty property: keyitem");
+      failed = true;
     }
-
-    return success;
+    return !failed;
   }
 }
