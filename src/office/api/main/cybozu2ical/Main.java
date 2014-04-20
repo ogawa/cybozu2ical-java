@@ -1,12 +1,10 @@
 package office.api.main.cybozu2ical;
 
-import java.io.BufferedReader;
 import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.IOException;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.logging.Logger;
 
 import org.apache.axiom.om.OMElement;
@@ -24,11 +22,6 @@ public class Main {
 
   private static Logger logger = Logger.getLogger("cybozu2ical");
 
-  private static String uidFormat = "%s@";
-
-  private static String sysUserDir = System.getProperty("user.dir");
-  private static String sysFileSeparator = System.getProperty("file.separator");
-
   /**
    * サイボウズOfficeからスケジュールを取得し、iCalendar形式のファイルを出力します。
    * 
@@ -39,7 +32,11 @@ public class Main {
 
     Options options = new Options();
     options.addOption("c", "config", true, "use given config file");
-    options.addOption("i", "input", true, "use given input file [MANDATORY]");
+    options.addOption("o", "output", true, "use given output file");
+    options.addOption("u", "user", true,
+        "use given user login name or id [MANDATORY]");
+    options.addOption("s", "start", true, "use given start date [YYYY-mm-dd]");
+    options.addOption("e", "end", true, "use given end date [YYYY-mm-dd]");
     options.addOption("d", "debug", false, "print debugging information");
     options.addOption("h", "help", false, "print this message");
     BasicParser parser = new BasicParser();
@@ -52,16 +49,45 @@ public class Main {
       return;
     }
 
-    if (cmd.hasOption("help") || !cmd.hasOption("input")) {
+    // help
+    if (cmd.hasOption("help") || !cmd.hasOption("user")) {
       printHelp(options);
       return;
     }
 
+    // start, end
+    Date spanStart = null;
+    Date spanEnd = null;
+    if (cmd.hasOption("start"))
+      spanStart = DateHelper.parseDate(cmd.getOptionValue("start"));
+    if (spanStart == null) {
+      Calendar cal = Calendar.getInstance();
+      cal.add(Calendar.MONTH, -1);
+      spanStart = cal.getTime();
+    }
+    if (cmd.hasOption("end"))
+      spanEnd = DateHelper.parseDate(cmd.getOptionValue("end"));
+    if (spanEnd == null) {
+      Calendar cal = Calendar.getInstance();
+      cal.add(Calendar.MONTH, 1);
+      spanEnd = cal.getTime();
+    }
+
+    // Calendar file
+    String calendarFile = null;
+    if (cmd.hasOption("output")) {
+      calendarFile = cmd.getOptionValue("output");
+    } else {
+      calendarFile = cmd.getOptionValue("user") + ".ics";
+    }
+
     // config file
-    String configFile = sysUserDir + sysFileSeparator
-        + "cybozu2ical.properties";
+    String configFile = null;
     if (cmd.hasOption("config")) {
       configFile = cmd.getOptionValue("config");
+    } else {
+      configFile = System.getProperty("user.dir")
+          + System.getProperty("file.separator") + "cybozu2ical.properties";
     }
     Config config = null;
     try {
@@ -74,28 +100,8 @@ public class Main {
       return;
     }
 
-    // input file
-    String inputFile = cmd.getOptionValue("input");
-    List<String> inputDataList = new ArrayList<String>();
-    try {
-      BufferedReader reader = new BufferedReader(new FileReader(inputFile));
-      String line;
-      while ((line = reader.readLine()) != null) {
-        inputDataList.add(line);
-      }
-      reader.close();
-    } catch (IOException e) {
-      e.printStackTrace();
-      return;
-    }
-
     // other common variables
-    uidFormat = "%s@" + config.getOfficeURL().getHost();
-    String exportDir = config.getExportDir();
-    if (!exportDir.substring(exportDir.length() - sysFileSeparator.length())
-        .equals(sysFileSeparator)) {
-      exportDir += sysFileSeparator;
-    }
+    String uidFormat = "%s@" + config.getOfficeURL().getHost();
 
     // generate SOAP client
     CBClient client;
@@ -108,62 +114,44 @@ public class Main {
       return;
     }
 
-    int succeeded = 0;
-    for (String data : inputDataList) {
-      logger.info("Begin Processing: " + data);
-
-      String[] columns = data.split(",");
-      if (columns.length < 3) {
-        logger.warning("Insufficient number of items: " + data);
-        continue;
-      }
-
-      String loginName = columns[0];
-      String startDate = columns[1];
-      String endDate = columns[2];
-
-      // generate loginID for getEventsByTarget
-      String loginID;
-      if (config.getKeyItem().trim().equals(CBClient.KEYITEM_NAME)) {
-        loginID = client.getLoginIDByLoginName(columns[0]);
-      } else {
-        loginID = columns[0];
-      }
-      if (loginID == null) {
-        continue;
-      }
-
-      OMElement node = client.getEventsByTarget(loginID,
-          DateHelper.parseDate(startDate), DateHelper.parseDate(endDate));
-      if (cmd.hasOption("debug")) {
-        System.out.println(node);
-      }
-      CalendarGenerator generator = new CalendarGenerator(node,
-          "cybozu2ical-java/0.01", uidFormat);
-      net.fortuna.ical4j.model.Calendar calendar = generator.getCalendar();
-
-      String exportFile = exportDir + loginName + ".ics";
-      CalendarOutputter outputter = new CalendarOutputter();
-      try {
-        FileOutputStream out = new FileOutputStream(exportFile);
-        outputter.output(calendar, out);
-      } catch (IOException | ValidationException e) {
-        e.printStackTrace();
-        return;
-      }
-      logger.info("Created (" + exportFile + ")");
-      logger.info("End Processing: " + data);
-      succeeded++;
+    // loginName, loginID
+    String loginName = cmd.getOptionValue("user");
+    String loginID = null;
+    if (config.getKeyItem().trim().equals(CBClient.KEYITEM_NAME)) {
+      loginID = client.getLoginIDByLoginName(loginName);
+    } else {
+      loginID = loginName;
+    }
+    if (loginID == null) {
+      logger.severe("Failed to get login ID");
+      return;
     }
 
-    int total = inputDataList.size();
-    logger.info("End Processing (total:" + total + " succeeded:" + succeeded
-        + " failed:" + (total - succeeded) + ")");
+    // generate calendar
+    OMElement node = client.getEventsByTarget(loginID, spanStart, spanEnd);
+    if (cmd.hasOption("debug")) {
+      System.out.println(node);
+    }
+    CalendarGenerator generator = new CalendarGenerator(node,
+        "cybozu2ical-java/0.01", uidFormat);
+    net.fortuna.ical4j.model.Calendar calendar = generator.getCalendar();
+
+    // output calendar
+    CalendarOutputter outputter = new CalendarOutputter();
+    try {
+      FileOutputStream out = new FileOutputStream(calendarFile);
+      outputter.output(calendar, out);
+    } catch (IOException | ValidationException e) {
+      e.printStackTrace();
+      return;
+    }
+    logger.info("Created (" + calendarFile + ")");
+
   }
 
   private static void printHelp(Options options) {
     HelpFormatter formatter = new HelpFormatter();
-    formatter.printHelp("cybozu2ical [options]", options);
+    formatter.printHelp("cybozu2ical -u <arg> [options]", options);
   }
 
   /**
@@ -180,7 +168,6 @@ public class Main {
     String username = config.getUsername();
     String pwd = config.getPassword();
     String keyitem = config.getKeyItem();
-    String exportdir = config.getExportDir();
 
     if (uri == null || uri.toString().trim().equals("")) {
       logger.severe(createErrMsg(Config.ConfigKeys.OFFICEURL.getKey()));
@@ -206,11 +193,6 @@ public class Main {
         logger.severe(createErrMsg(Config.ConfigKeys.KEYITEM.getKey()));
         success = false;
       }
-    }
-
-    if (exportdir == null) {
-      logger.severe(createErrMsg(Config.ConfigKeys.EXPORTDIR.getKey()));
-      success = false;
     }
 
     return success;

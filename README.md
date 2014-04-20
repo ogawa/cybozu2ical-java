@@ -17,15 +17,14 @@ Edit "cybozu2ical.properties" so as to fit to your environment.
     $ cp cybozu2ical.properties.sample cybozu2ical.properties
     $ vi cybozu2ical.properties
 
-Create an input file which specifies login name, start date, and end date.
-
-    $ cat > input.csv
-    your-login-name,2011-06-01T00:00:00,2011-08-01T00:00:00
-    ^D
-
 Run cybozu2ical.sh script.
 
-    $ ./cybozu2ical.sh -i input.csv
+    $ ./cybozu2ical.sh -u your-login-name
+    $ ./cybozu2ical.sh -u your-login-name -s 2011-06-01 -e 2011-08-01
+
+Print help message.
+
+    $ ./cybozu2ical.sh -h
 
 Acknowledgment
 --------------

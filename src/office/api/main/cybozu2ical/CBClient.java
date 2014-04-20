@@ -5,6 +5,7 @@ import java.util.Date;
 
 import javax.xml.namespace.QName;
 
+import jp.co.joyzo.office.api.base.BaseGetUsersById;
 import jp.co.joyzo.office.api.base.BaseGetUsersByLoginName;
 import jp.co.joyzo.office.api.schedule.ScheduleGetEventsByTarget;
 import jp.co.joyzo.office.api.schedule.util.Span;
@@ -34,24 +35,42 @@ public class CBClient extends jp.co.joyzo.office.api.common.CBServiceClient {
     BaseGetUsersByLoginName action = new BaseGetUsersByLoginName();
     action.addLoginName(loginName);
 
-    String loginID = null;
     OMElement result = null;
     try {
       result = this.sendReceive(action);
-    } catch (AxisFault e) {
-      e.printStackTrace();
-    } catch (ConnectTimeoutException e) {
-      e.printStackTrace();
-    } catch (RemoteException e) {
+    } catch (ConnectTimeoutException | RemoteException e) {
       e.printStackTrace();
     } catch (Throwable e) {
       e.printStackTrace();
     }
+
+    String loginID = null;
     if (result != null) {
       OMElement user = result.getFirstElement().getFirstElement();
       loginID = user.getAttributeValue(new QName("key"));
     }
     return loginID;
+  }
+
+  public String getLoginNameById(String id) {
+    BaseGetUsersById action = new BaseGetUsersById();
+    action.addUserID(id);
+
+    OMElement result = null;
+    try {
+      result = this.sendReceive(action);
+    } catch (ConnectTimeoutException | RemoteException e) {
+      e.printStackTrace();
+    } catch (Throwable e) {
+      e.printStackTrace();
+    }
+
+    String loginName = null;
+    if (result != null) {
+      OMElement user = result.getFirstElement().getFirstElement();
+      loginName = user.getAttributeValue(new QName("login_name"));
+    }
+    return loginName;
   }
 
   /**
@@ -82,11 +101,7 @@ public class CBClient extends jp.co.joyzo.office.api.common.CBServiceClient {
     OMElement result = null;
     try {
       result = this.sendReceive(action);
-    } catch (AxisFault e) {
-      e.printStackTrace();
-    } catch (ConnectTimeoutException e) {
-      e.printStackTrace();
-    } catch (RemoteException e) {
+    } catch (ConnectTimeoutException | RemoteException e) {
       e.printStackTrace();
     } catch (Throwable e) {
       e.printStackTrace();
