@@ -19,8 +19,9 @@ Edit "cybozu2ical.properties" so as to fit to your environment.
 
 Run cybozu2ical.sh script.
 
-    $ ./cybozu2ical.sh -u your-login-name
     $ ./cybozu2ical.sh -u your-login-name -s 2011-06-01 -e 2011-08-01
+    $ ./cybozu2ical.sh -u your-login-name
+      (by default, the script look up events including one month before and after today)
 
 Print help message.
 

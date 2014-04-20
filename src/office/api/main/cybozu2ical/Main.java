@@ -36,6 +36,7 @@ public class Main {
     try {
       cmd = parser.parse(options, args);
     } catch (ParseException e) {
+      e.printStackTrace();
       printHelp(options);
       return;
     }
@@ -49,15 +50,17 @@ public class Main {
     // start, end
     Date spanStart = null;
     Date spanEnd = null;
-    if (cmd.hasOption("start"))
+    if (cmd.hasOption("start")) {
       spanStart = DateHelper.parseDate(cmd.getOptionValue("start"));
+    }
     if (spanStart == null) {
       Calendar cal = Calendar.getInstance();
       cal.add(Calendar.MONTH, -1);
       spanStart = cal.getTime();
     }
-    if (cmd.hasOption("end"))
+    if (cmd.hasOption("end")) {
       spanEnd = DateHelper.parseDate(cmd.getOptionValue("end"));
+    }
     if (spanEnd == null) {
       Calendar cal = Calendar.getInstance();
       cal.add(Calendar.MONTH, 1);
@@ -66,10 +69,11 @@ public class Main {
 
     // Calendar file
     String calendarFile = null;
-    if (cmd.hasOption("output"))
+    if (cmd.hasOption("output")) {
       calendarFile = cmd.getOptionValue("output");
-    else
+    } else {
       calendarFile = cmd.getOptionValue("user") + ".ics";
+    }
 
     // config file
     Config config = null;
@@ -95,13 +99,10 @@ public class Main {
       return;
     }
 
-    // loginName, loginID
-    String loginName = cmd.getOptionValue("user");
-    String loginID = null;
+    // loginId
+    String loginID = cmd.getOptionValue("user");
     if (config.getKeyitem().equals(CBClient.KEYITEM_NAME)) {
-      loginID = client.getLoginIDByLoginName(loginName);
-    } else {
-      loginID = loginName;
+      loginID = client.getLoginIDByLoginName(loginID);
     }
     if (loginID == null) {
       logger.severe("Failed to get login ID");
@@ -110,8 +111,9 @@ public class Main {
 
     // generate calendar
     OMElement node = client.getEventsByTarget(loginID, spanStart, spanEnd);
-    if (cmd.hasOption("debug"))
+    if (cmd.hasOption("debug")) {
       System.out.println(node);
+    }
     CalendarGenerator generator = new CalendarGenerator(node,
         "cybozu2ical-java/0.01", uidFormat);
     net.fortuna.ical4j.model.Calendar calendar = generator.getCalendar();
@@ -164,11 +166,12 @@ public class Main {
    */
   private static Config getConfig(CommandLine cmd) throws IOException {
     String configFile = null;
-    if (cmd.hasOption("config"))
+    if (cmd.hasOption("config")) {
       configFile = cmd.getOptionValue("config");
-    else
+    } else {
       configFile = System.getProperty("user.dir")
           + System.getProperty("file.separator") + "cybozu2ical.properties";
+    }
     return new Config(configFile);
   }
 
@@ -180,23 +183,22 @@ public class Main {
    * @return エラーの有無
    */
   private static boolean checkConfig(Config config) {
-    boolean failed = false;
     if (config.getOfficeURL() == null) {
       logger.severe("invalid or empty property: officeURL");
-      failed = true;
+      return false;
     }
     if (config.getUsername() == null) {
       logger.severe("invalid or empty property: username");
-      failed = true;
+      return false;
     }
     if (config.getPassword() == null) {
       logger.severe("invalid or empty property: password");
-      failed = true;
+      return false;
     }
     if (config.getKeyitem() == null) {
       logger.severe("invalid or empty property: keyitem");
-      failed = true;
+      return false;
     }
-    return !failed;
+    return true;
   }
 }

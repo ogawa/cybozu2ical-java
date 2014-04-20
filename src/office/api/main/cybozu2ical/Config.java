@@ -12,7 +12,7 @@ public class Config {
   private String username = null;
   private String password = null;
   private String keyitem = CBClient.KEYITEM_NAME;
-  
+
   public Config(String file) {
     Properties props = null;
     try {
@@ -29,13 +29,15 @@ public class Config {
       }
       if (props.containsKey("username")) {
         username = props.getProperty("username").trim();
-        if (username.equals(""))
+        if (username.equals("")) {
           username = null;
+        }
       }
       if (props.containsKey("password")) {
         password = props.getProperty("password").trim();
-        if (password.equals(""))
+        if (password.equals("")) {
           password = null;
+        }
       }
       if (props.containsKey("keyitem")) {
         if (props.getProperty("keyitem").trim().equals(CBClient.KEYITEM_ID)) {
@@ -44,28 +46,35 @@ public class Config {
       }
     }
   }
-  
+
   public URI getOfficeURL() {
     return officeURL;
   }
+
   public void setOfficeURL(URI officeURL) {
     this.officeURL = officeURL;
   }
+
   public String getUsername() {
     return username;
   }
+
   public void setUsername(String username) {
     this.username = username;
   }
+
   public String getPassword() {
     return password;
   }
+
   public void setPassword(String password) {
     this.password = password;
   }
+
   public String getKeyitem() {
     return keyitem;
   }
+
   public void setKeyitem(String keyitem) {
     this.keyitem = keyitem;
   }
