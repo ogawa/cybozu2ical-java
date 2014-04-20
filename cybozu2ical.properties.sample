@@ -9,6 +9,3 @@ password=password
 #登録対象ユーザーの識別項目
 # id：内部ユーザーID、name：ログイン名
 keyitem=name
-
-# スケジュールデータの出力先ディレクトリ
-exportdir=/var/office/export

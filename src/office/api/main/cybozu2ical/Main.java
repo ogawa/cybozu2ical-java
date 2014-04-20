@@ -23,10 +23,10 @@ public class Main {
   private static Logger logger = Logger.getLogger("cybozu2ical");
 
   /**
-   * サイボウズOfficeからスケジュールを取得し、iCalendar形式のファイルを出力します。
+   * サイボウズOfficeからスケジュールを取得し、iCalendar形式のファイルを出力する。
    * 
    * @param args
-   *          オプション
+   *          String[]
    */
   public static void main(String[] args) {
 
@@ -75,20 +75,18 @@ public class Main {
 
     // Calendar file
     String calendarFile = null;
-    if (cmd.hasOption("output")) {
+    if (cmd.hasOption("output"))
       calendarFile = cmd.getOptionValue("output");
-    } else {
+    else
       calendarFile = cmd.getOptionValue("user") + ".ics";
-    }
 
     // config file
     String configFile = null;
-    if (cmd.hasOption("config")) {
+    if (cmd.hasOption("config"))
       configFile = cmd.getOptionValue("config");
-    } else {
+    else
       configFile = System.getProperty("user.dir")
           + System.getProperty("file.separator") + "cybozu2ical.properties";
-    }
     Config config = null;
     try {
       config = new Config(configFile);
@@ -96,9 +94,8 @@ public class Main {
       e.printStackTrace();
       return;
     }
-    if (!checkConfig(config)) {
+    if (!checkConfig(config))
       return;
-    }
 
     // other common variables
     String uidFormat = "%s@" + config.getOfficeURL().getHost();
@@ -129,9 +126,8 @@ public class Main {
 
     // generate calendar
     OMElement node = client.getEventsByTarget(loginID, spanStart, spanEnd);
-    if (cmd.hasOption("debug")) {
+    if (cmd.hasOption("debug"))
       System.out.println(node);
-    }
     CalendarGenerator generator = new CalendarGenerator(node,
         "cybozu2ical-java/0.01", uidFormat);
     net.fortuna.ical4j.model.Calendar calendar = generator.getCalendar();
@@ -149,13 +145,19 @@ public class Main {
 
   }
 
+  /**
+   * ヘルプメッセージを出力する。
+   * 
+   * @param options
+   *          org.apache.commons.cli.Options
+   */
   private static void printHelp(Options options) {
     HelpFormatter formatter = new HelpFormatter();
     formatter.printHelp("cybozu2ical -u <arg> [options]", options);
   }
 
   /**
-   * propertiesファイルの内容をチェックします。 必須漏れや形式間違いがある場合はfalseを返します。
+   * propertiesファイルの内容をチェックする。必須漏れや形式間違いがある場合はfalseを返す。
    * 
    * @param config
    *          propertiesファイル情報
@@ -166,46 +168,35 @@ public class Main {
 
     URI uri = config.getOfficeURL();
     String username = config.getUsername();
-    String pwd = config.getPassword();
+    String password = config.getPassword();
     String keyitem = config.getKeyItem();
 
     if (uri == null || uri.toString().trim().equals("")) {
-      logger.severe(createErrMsg(Config.ConfigKeys.OFFICEURL.getKey()));
+      logger.severe("Invalid " + Config.ConfigKeys.OFFICEURL.getKey());
       success = false;
     }
 
     if (username == null || username.trim().equals("")) {
-      logger.severe(createErrMsg(Config.ConfigKeys.USERNAME.getKey()));
+      logger.severe("Invalid " + Config.ConfigKeys.USERNAME.getKey());
       success = false;
     }
 
-    if (pwd == null) {
-      logger.severe(createErrMsg(Config.ConfigKeys.PASSWORD.getKey()));
+    if (password == null) {
+      logger.severe("Invalid " + Config.ConfigKeys.PASSWORD.getKey());
       success = false;
     }
 
     if (keyitem == null) {
-      logger.severe(createErrMsg(Config.ConfigKeys.KEYITEM.getKey()));
+      logger.severe("Invalid " + Config.ConfigKeys.KEYITEM.getKey());
       success = false;
     } else { // 設定値が「id」、「name」以外の場合
       if (!keyitem.equals(CBClient.KEYITEM_ID)
           && !keyitem.equals(CBClient.KEYITEM_NAME)) {
-        logger.severe(createErrMsg(Config.ConfigKeys.KEYITEM.getKey()));
+        logger.severe("Invalid " + Config.ConfigKeys.KEYITEM.getKey());
         success = false;
       }
     }
 
     return success;
-  }
-
-  /**
-   * propertiesファイルの内容チェック時でエラー時に出力されるメッセージを生成します。
-   * 
-   * @param data
-   *          エラーメッセージに表示させるチェック対象となるキー名
-   * @return エラーメッセージ
-   */
-  private static String createErrMsg(String data) {
-    return "Value is not set correctly for " + data + " in properties file";
   }
 }

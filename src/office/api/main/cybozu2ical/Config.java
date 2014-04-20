@@ -116,8 +116,7 @@ public class Config {
   }
 
   /**
-   * アカウントファイルの exportdir キーで指定された値を返します。<br />
-   * キーが存在しない場合、または日付の形式が不正な場合は null を返します。
+   * アカウントファイルの exportdir キーで指定された値を返します。
    * 
    * @return java.lang.String 出力先ディレクトリ
    */
