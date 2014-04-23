@@ -5,7 +5,6 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 
 import javax.xml.namespace.QName;
 
@@ -179,8 +178,7 @@ public class EventGenerator {
       }
       Iterator<?> exclusiveDatetimesIter = repeatInfo
           .getChildrenWithLocalName("exclusive_datetimes");
-      List<Date> exclusiveDatesStart = new ArrayList<Date>();
-      List<Date> exclusiveDatesEnd = new ArrayList<Date>();
+      ArrayList<Date> exclusiveDates = new ArrayList<Date>();
       while (exclusiveDatetimesIter.hasNext()) {
         OMElement exclusiveDatetimes = (OMElement) exclusiveDatetimesIter
             .next();
@@ -189,26 +187,14 @@ public class EventGenerator {
         while (exclusiveDatetimeIter.hasNext()) {
           OMElement exclusiveDatetime = (OMElement) exclusiveDatetimeIter
               .next();
-          Iterator<?> exclusiveDatetimeAttr = exclusiveDatetime
-              .getAllAttributes();
-          while (exclusiveDatetimeAttr.hasNext()) {
-            OMAttribute attr = (OMAttribute) exclusiveDatetimeAttr.next();
-            String attrName = attr.getLocalName();
-            String attrValue = attr.getAttributeValue();
-            attrValue = attrValue.substring(0, 10);
-            if (attrName.equals("start")) {
-              exclusiveDatesStart.add(DateHelper.parseDate(attrValue));
-            } else if (attrName.equals("end")) {
-              exclusiveDatesEnd.add(DateHelper.parseDate(attrValue));
-            }
-          }
+          String attrValue = exclusiveDatetime.getAttributeValue(new QName(
+              "start"));
+          Date attrDate = DateHelper.parseDate(attrValue);
+          exclusiveDates.add(attrDate);
         }
       }
-      if (exclusiveDatesStart != null) {
-        map.put("exclusiveDates.start", exclusiveDatesStart);
-      }
-      if (exclusiveDatesEnd != null) {
-        map.put("exclusiveDates.end", exclusiveDatesEnd);
+      if (exclusiveDates != null) {
+        map.put("exclusiveDates", exclusiveDates);
       }
     }
   }
@@ -277,7 +263,7 @@ public class EventGenerator {
 
   private void makeRepeatedEvent() {
 
-    if (props.getProperty(net.fortuna.ical4j.model.Property.DTSTART) == null) {
+    if (!props.contains(net.fortuna.ical4j.model.Property.DTSTART)) {
       Date dtstart = (Date) map.get("condition.start");
       if (dtstart == null) {
         dtstart = (Date) map.get("start");
@@ -344,9 +330,9 @@ public class EventGenerator {
       props.add(new RRule(recur));
     }
 
-    if (map.containsKey("exclusiveDates.start")) {
+    if (map.containsKey("exclusiveDates")) {
       @SuppressWarnings("unchecked")
-      List<Date> dates = (List<Date>) map.get("exclusiveDates.start");
+      ArrayList<Date> dates = (ArrayList<Date>) map.get("exclusiveDates");
       // generate multiple EXDATEs for avoiding iCal.app bug
       for (Date date : dates) {
         DateList dateList = new DateList();
