@@ -89,7 +89,7 @@ public class EventGenerator {
       map.put(attr.getLocalName(), attr.getAttributeValue());
     }
 
-    String location = extractLocation(node);
+    String location = this.extractLocation(node);
     if (location != null) {
       map.put("location", location);
     }
@@ -103,11 +103,11 @@ public class EventGenerator {
         Iterator<?> datetimeAttrIter = datetime.getAllAttributes();
         while (datetimeAttrIter.hasNext()) {
           OMAttribute attr = (OMAttribute) datetimeAttrIter.next();
-          String attrName = attr.getLocalName();
-          String attrValue = attr.getAttributeValue();
-          Date date = DateHelper.parseDate(attrValue);
+          String key = attr.getLocalName();
+          String value = attr.getAttributeValue();
+          Date date = DateHelper.parseDate(value);
           if (date != null) {
-            map.put(attrName, date);
+            map.put(key, date);
           }
         }
       }
@@ -128,59 +128,25 @@ public class EventGenerator {
           Iterator<?> conditionAttr = condition.getAllAttributes();
           while (conditionAttr.hasNext()) {
             OMAttribute attr = (OMAttribute) conditionAttr.next();
-            String attrName = "condition." + attr.getLocalName();
-            String attrValue = attr.getAttributeValue();
-            map.put(attrName, attrValue);
-          }
-          String start_date = (String) map.get("condition.start_date");
-          String start_time = (String) map.get("condition.start_time");
-          String end_time = (String) map.get("condition.end_time");
-          String start = null;
-          String end = null;
-          if (start_date != null) {
-            start = start_date;
-            if (start_time != null) {
-              start += "T" + start_time;
-            }
-            end = start_date;
-            if (end_time != null) {
-              end += "T" + end_time;
-            }
-          }
-          Date startDate = DateHelper.parseDate(start);
-          if (startDate != null) {
-            map.put("condition.start", startDate);
-          }
-          Date endDate = DateHelper.parseDate(end);
-          if (endDate != null) {
-            map.put("condition.end", endDate);
+            map.put("condition." + attr.getLocalName(),
+                attr.getAttributeValue());
           }
         }
+      }
+      Date condStartDate = this.extractCondStartDate();
+      if (condStartDate != null) {
+        map.put("condition.start", condStartDate);
+      }
+      Date condEndDate = this.extractCondEndDate();
+      if (condEndDate != null) {
+        map.put("condition.end", condEndDate);
+      }
+      Date untilDate = this.extractUntilDate();
+      if (untilDate != null) {
+        map.put("condition.until", untilDate);
       }
 
-      // schedule_event/repeat_info/exclusive_datetimes+
-      Iterator<?> exclusiveDatetimesIter = repeatInfo
-          .getChildrenWithLocalName("exclusive_datetimes");
-      ArrayList<Date> exclusiveDates = new ArrayList<Date>();
-      String offsetTime = (String) map.get("condition.start_time");
-      while (exclusiveDatetimesIter.hasNext()) {
-        OMElement exclusiveDatetimes = (OMElement) exclusiveDatetimesIter
-            .next();
-        Iterator<?> exclusiveDatetimeIter = exclusiveDatetimes
-            .getChildrenWithLocalName("exclusive_datetime");
-        while (exclusiveDatetimeIter.hasNext()) {
-          OMElement exclusiveDatetime = (OMElement) exclusiveDatetimeIter
-              .next();
-          String attrValue = exclusiveDatetime.getAttributeValue(new QName(
-              "start"));
-          attrValue = attrValue.substring(0, 10); // YYYY-mm-dd
-          if (offsetTime != null) {
-            attrValue = attrValue + "T" + offsetTime;
-          }
-          Date attrDate = DateHelper.parseDate(attrValue);
-          exclusiveDates.add(attrDate);
-        }
-      }
+      ArrayList<Date> exclusiveDates = this.extractExDates(repeatInfo);
       if (exclusiveDates != null) {
         map.put("exclusiveDates", exclusiveDates);
       }
@@ -188,7 +154,7 @@ public class EventGenerator {
   }
 
   // scedule_event/members/member/facility
-  private static String extractLocation(OMElement node) {
+  private String extractLocation(OMElement node) {
     String location = null;
 
     Iterator<?> membersIter = node.getChildrenWithLocalName("members");
@@ -205,6 +171,68 @@ public class EventGenerator {
       }
     }
     return location;
+  }
+
+  private Date extractCondStartDate() {
+    Date date = null;
+    String start_date = (String) map.get("condition.start_date");
+    String start_time = (String) map.get("condition.start_time");
+    if (start_date != null) {
+      String s = (start_time == null) ? start_date : start_date + "T"
+          + start_time;
+      date = DateHelper.parseDate(s);
+    }
+    return date;
+  }
+
+  private Date extractCondEndDate() {
+    Date date = null;
+    String start_date = (String) map.get("condition.start_date");
+    String end_time = (String) map.get("condition.end_time");
+    if (start_date != null) {
+      String s = (end_time == null) ? start_date : start_date + "T" + end_time;
+      date = DateHelper.parseDate(s);
+    }
+    return date;
+  }
+
+  private Date extractUntilDate() {
+    Date date = null;
+    String end_date = (String) map.get("condition.end_date");
+    String end_time = (String) map.get("condition.end_time");
+    if (end_date != null) {
+      String s = (end_time == null) ? end_date : end_date + "T" + end_time;
+      date = DateHelper.parseDate(s);
+    }
+    return date;
+  }
+
+  // schedule_event/repeat_info/exclusive_datetimes+
+  private ArrayList<Date> extractExDates(OMElement node) {
+    ArrayList<Date> exclusiveDates = new ArrayList<Date>();
+
+    Iterator<?> exclusiveDatetimesIter = node
+        .getChildrenWithLocalName("exclusive_datetimes");
+
+    String offsetTime = (String) map.get("condition.start_time");
+    while (exclusiveDatetimesIter.hasNext()) {
+      OMElement exclusiveDatetimes = (OMElement) exclusiveDatetimesIter.next();
+      Iterator<?> exclusiveDatetimeIter = exclusiveDatetimes
+          .getChildrenWithLocalName("exclusive_datetime");
+      while (exclusiveDatetimeIter.hasNext()) {
+        OMElement exclusiveDatetime = (OMElement) exclusiveDatetimeIter.next();
+        String value = exclusiveDatetime.getAttributeValue(new QName("start"));
+        value = value.substring(0, 10); // YYYY-mm-dd
+        if (offsetTime != null) {
+          value = value + "T" + offsetTime;
+        }
+        Date exDate = DateHelper.parseDate(value);
+        if (exDate != null) {
+          exclusiveDates.add(exDate);
+        }
+      }
+    }
+    return exclusiveDates;
   }
 
   private void generatePropsFromMap() {
@@ -295,14 +323,6 @@ public class EventGenerator {
       recur = new Recur();
       recur.setFrequency(Recur.WEEKLY);
       recur.setWeekStartDay(index2weekDay(conditionWeek).toString());
-      if (map.containsKey("condition.end_date")) {
-        String endDate = (String) map.get("condition.end_date");
-        if (map.containsKey("condition.end_time")) {
-          endDate += "T" + map.get("condition.end_time");
-        }
-        recur.setUntil(new net.fortuna.ical4j.model.Date(DateHelper
-            .parseDate(endDate)));
-      }
     } else if (conditionType.equals("1stweek")
         || conditionType.equals("2ndweek") || conditionType.equals("3rdweek")
         || conditionType.equals("4thweek") || conditionType.equals("5thweek")) {
@@ -312,37 +332,23 @@ public class EventGenerator {
       recur.setFrequency(Recur.MONTHLY);
       recur.getDayList().add(
           new WeekDay(index2weekDay(conditionWeek), numOfWeek));
-      if (map.containsKey("condition.end_date")) {
-        String endDate = (String) map.get("condition.end_date");
-        if (map.containsKey("condition.end_time")) {
-          endDate += "T" + map.get("condition.end_time");
-        }
-        recur.setUntil(new net.fortuna.ical4j.model.Date(DateHelper
-            .parseDate(endDate)));
-      }
     } else if (conditionType.equals("month")) {
       String conditionDay = (String) map.get("condition.day");
       recur = new Recur();
       recur.setFrequency(Recur.MONTHLY);
       recur.getMonthDayList().add(Integer.parseInt(conditionDay));
-      if (map.containsKey("condition.end_date")) {
-        String endDate = (String) map.get("condition.end_date");
-        if (map.containsKey("condition.end_time")) {
-          endDate += "T" + map.get("condition.end_time");
-        }
-        recur.setUntil(new net.fortuna.ical4j.model.Date(DateHelper
-            .parseDate(endDate)));
-      }
     }
     if (recur != null) {
+      if (map.containsKey("condition.until")) {
+        recur.setUntil(new net.fortuna.ical4j.model.Date((Date) map
+            .get("condition.until")));
+      }
       props.add(new RRule(recur));
     }
 
     if (map.containsKey("exclusiveDates")) {
       @SuppressWarnings("unchecked")
       ArrayList<Date> dates = (ArrayList<Date>) map.get("exclusiveDates");
-      // generate multiple EXDATEs for avoiding iCal.app bug
-
       if (map.containsKey("allday") && map.get("allday").equals("true")) {
         for (Date date : dates) {
           DateList dateList = new DateList();
