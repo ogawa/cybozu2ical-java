@@ -4,9 +4,6 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.Iterator;
-
-import javax.xml.namespace.QName;
 
 import net.fortuna.ical4j.model.DateList;
 import net.fortuna.ical4j.model.PropertyList;
@@ -23,41 +20,29 @@ import net.fortuna.ical4j.model.property.RRule;
 import net.fortuna.ical4j.model.property.Summary;
 import net.fortuna.ical4j.model.property.Uid;
 
-import org.apache.axiom.om.OMAttribute;
 import org.apache.axiom.om.OMElement;
 
 public class EventGenerator {
-  private OMElement node = null;
   private HashMap<String, Object> map = null;
   private VEvent vevent = null;
   private PropertyList props = null;
   private String uidFormat = "%s@";
 
   public EventGenerator(OMElement node) {
-    this.map = new HashMap<String, Object>();
+    EventMap eventMap = new EventMap(node);
+    this.setMap(eventMap.getMap());
     this.props = new PropertyList();
-    this.setNode(node);
-    this.generateMapFromNode();
     this.generatePropsFromMap();
     this.vevent = new VEvent(props);
   }
 
   public EventGenerator(OMElement node, String format) {
-    this.map = new HashMap<String, Object>();
+    EventMap eventMap = new EventMap(node);
+    this.setMap(eventMap.getMap());
     this.props = new PropertyList();
-    this.setNode(node);
     this.setUidFormat(format);
-    this.generateMapFromNode();
     this.generatePropsFromMap();
     this.vevent = new VEvent(props);
-  }
-
-  public OMElement getNode() {
-    return node;
-  }
-
-  public void setNode(OMElement node) {
-    this.node = node;
   }
 
   public void setUidFormat(String format) {
@@ -76,163 +61,12 @@ public class EventGenerator {
     return props;
   }
 
+  public void setMap(HashMap<String, Object> map) {
+    this.map = map;
+  }
+
   public void setProps(PropertyList props) {
     this.props = props;
-  }
-
-  private void generateMapFromNode() {
-
-    // all attributes of schedule_event
-    Iterator<?> attrIter = node.getAllAttributes();
-    while (attrIter.hasNext()) {
-      OMAttribute attr = (OMAttribute) attrIter.next();
-      map.put(attr.getLocalName(), attr.getAttributeValue());
-    }
-
-    String location = this.extractLocation(node);
-    if (location != null) {
-      map.put("location", location);
-    }
-
-    // schedule_event/when/datetime
-    Iterator<?> whenIter = node.getChildrenWithLocalName("when");
-    while (whenIter.hasNext()) {
-      OMElement when = (OMElement) whenIter.next();
-      OMElement datetime = when.getFirstElement();
-      if (datetime != null) {
-        Iterator<?> datetimeAttrIter = datetime.getAllAttributes();
-        while (datetimeAttrIter.hasNext()) {
-          OMAttribute attr = (OMAttribute) datetimeAttrIter.next();
-          String key = attr.getLocalName();
-          String value = attr.getAttributeValue();
-          Date date = DateHelper.parseDate(value);
-          if (date != null) {
-            map.put(key, date);
-          }
-        }
-      }
-      break;
-    }
-
-    // schedule_event/repeat_info
-    Iterator<?> repeatInfoIter = node.getChildrenWithLocalName("repeat_info");
-    while (repeatInfoIter.hasNext()) {
-      OMElement repeatInfo = (OMElement) repeatInfoIter.next();
-
-      // schedule_event/repeat_info/condition
-      Iterator<?> conditionIter = repeatInfo
-          .getChildrenWithLocalName("condition");
-      while (conditionIter.hasNext()) {
-        OMElement condition = (OMElement) conditionIter.next();
-        if (condition != null) {
-          Iterator<?> conditionAttr = condition.getAllAttributes();
-          while (conditionAttr.hasNext()) {
-            OMAttribute attr = (OMAttribute) conditionAttr.next();
-            map.put("condition." + attr.getLocalName(),
-                attr.getAttributeValue());
-          }
-        }
-      }
-      Date condStartDate = this.extractCondStartDate();
-      if (condStartDate != null) {
-        map.put("condition.start", condStartDate);
-      }
-      Date condEndDate = this.extractCondEndDate();
-      if (condEndDate != null) {
-        map.put("condition.end", condEndDate);
-      }
-      Date untilDate = this.extractUntilDate();
-      if (untilDate != null) {
-        map.put("condition.until", untilDate);
-      }
-
-      ArrayList<Date> exclusiveDates = this.extractExDates(repeatInfo);
-      if (exclusiveDates != null) {
-        map.put("exclusiveDates", exclusiveDates);
-      }
-    }
-  }
-
-  // scedule_event/members/member/facility
-  private String extractLocation(OMElement node) {
-    String location = null;
-
-    Iterator<?> membersIter = node.getChildrenWithLocalName("members");
-    while (membersIter.hasNext()) {
-      OMElement members = (OMElement) membersIter.next();
-      Iterator<?> memberIter = members.getChildrenWithLocalName("member");
-      while (memberIter.hasNext()) {
-        OMElement member = (OMElement) memberIter.next();
-        OMElement facility = member.getFirstElement();
-        if (facility.getLocalName().equals("facility")) {
-          location = facility.getAttributeValue(new QName("name"));
-          break;
-        }
-      }
-    }
-    return location;
-  }
-
-  private Date extractCondStartDate() {
-    Date date = null;
-    String start_date = (String) map.get("condition.start_date");
-    String start_time = (String) map.get("condition.start_time");
-    if (start_date != null) {
-      String s = (start_time == null) ? start_date : start_date + "T"
-          + start_time;
-      date = DateHelper.parseDate(s);
-    }
-    return date;
-  }
-
-  private Date extractCondEndDate() {
-    Date date = null;
-    String start_date = (String) map.get("condition.start_date");
-    String end_time = (String) map.get("condition.end_time");
-    if (start_date != null) {
-      String s = (end_time == null) ? start_date : start_date + "T" + end_time;
-      date = DateHelper.parseDate(s);
-    }
-    return date;
-  }
-
-  private Date extractUntilDate() {
-    Date date = null;
-    String end_date = (String) map.get("condition.end_date");
-    String end_time = (String) map.get("condition.end_time");
-    if (end_date != null) {
-      String s = (end_time == null) ? end_date : end_date + "T" + end_time;
-      date = DateHelper.parseDate(s);
-    }
-    return date;
-  }
-
-  // schedule_event/repeat_info/exclusive_datetimes+
-  private ArrayList<Date> extractExDates(OMElement node) {
-    ArrayList<Date> exclusiveDates = new ArrayList<Date>();
-
-    Iterator<?> exclusiveDatetimesIter = node
-        .getChildrenWithLocalName("exclusive_datetimes");
-
-    String offsetTime = (String) map.get("condition.start_time");
-    while (exclusiveDatetimesIter.hasNext()) {
-      OMElement exclusiveDatetimes = (OMElement) exclusiveDatetimesIter.next();
-      Iterator<?> exclusiveDatetimeIter = exclusiveDatetimes
-          .getChildrenWithLocalName("exclusive_datetime");
-      while (exclusiveDatetimeIter.hasNext()) {
-        OMElement exclusiveDatetime = (OMElement) exclusiveDatetimeIter.next();
-        String value = exclusiveDatetime.getAttributeValue(new QName("start"));
-        value = value.substring(0, 10); // YYYY-mm-dd
-        if (offsetTime != null) {
-          value = value + "T" + offsetTime;
-        }
-        Date exDate = DateHelper.parseDate(value);
-        if (exDate != null) {
-          exclusiveDates.add(exDate);
-        }
-      }
-    }
-    return exclusiveDates;
   }
 
   private void generatePropsFromMap() {
