@@ -80,26 +80,6 @@ public class EventGenerator {
     this.props = props;
   }
 
-  // scedule_event/members/member/facility
-  private static String extractLocation(OMElement node) {
-    String location = null;
-
-    Iterator<?> membersIter = node.getChildrenWithLocalName("members");
-    while (membersIter.hasNext()) {
-      OMElement members = (OMElement) membersIter.next();
-      Iterator<?> memberIter = members.getChildrenWithLocalName("member");
-      while (memberIter.hasNext()) {
-        OMElement member = (OMElement) memberIter.next();
-        OMElement facility = member.getFirstElement();
-        if (facility.getLocalName().equals("facility")) {
-          location = facility.getAttributeValue(new QName("name"));
-          break;
-        }
-      }
-    }
-    return location;
-  }
-
   private void generateMapFromNode() {
 
     // all attributes of schedule_event
@@ -138,9 +118,10 @@ public class EventGenerator {
     Iterator<?> repeatInfoIter = node.getChildrenWithLocalName("repeat_info");
     while (repeatInfoIter.hasNext()) {
       OMElement repeatInfo = (OMElement) repeatInfoIter.next();
+
+      // schedule_event/repeat_info/condition
       Iterator<?> conditionIter = repeatInfo
           .getChildrenWithLocalName("condition");
-
       while (conditionIter.hasNext()) {
         OMElement condition = (OMElement) conditionIter.next();
         if (condition != null) {
@@ -176,9 +157,12 @@ public class EventGenerator {
           }
         }
       }
+
+      // schedule_event/repeat_info/exclusive_datetimes+
       Iterator<?> exclusiveDatetimesIter = repeatInfo
           .getChildrenWithLocalName("exclusive_datetimes");
       ArrayList<Date> exclusiveDates = new ArrayList<Date>();
+      String offsetTime = (String) map.get("condition.start_time");
       while (exclusiveDatetimesIter.hasNext()) {
         OMElement exclusiveDatetimes = (OMElement) exclusiveDatetimesIter
             .next();
@@ -189,6 +173,10 @@ public class EventGenerator {
               .next();
           String attrValue = exclusiveDatetime.getAttributeValue(new QName(
               "start"));
+          attrValue = attrValue.substring(0, 10); // YYYY-mm-dd
+          if (offsetTime != null) {
+            attrValue = attrValue + "T" + offsetTime;
+          }
           Date attrDate = DateHelper.parseDate(attrValue);
           exclusiveDates.add(attrDate);
         }
@@ -199,12 +187,24 @@ public class EventGenerator {
     }
   }
 
-  static WeekDay[] weekDays = { WeekDay.MO, WeekDay.TU, WeekDay.WE, WeekDay.TH,
-      WeekDay.FR, WeekDay.SA, WeekDay.SU };
+  // scedule_event/members/member/facility
+  private static String extractLocation(OMElement node) {
+    String location = null;
 
-  private static WeekDay index2weekDay(String week) {
-    int index = Integer.parseInt(week) - 1;
-    return weekDays[index];
+    Iterator<?> membersIter = node.getChildrenWithLocalName("members");
+    while (membersIter.hasNext()) {
+      OMElement members = (OMElement) membersIter.next();
+      Iterator<?> memberIter = members.getChildrenWithLocalName("member");
+      while (memberIter.hasNext()) {
+        OMElement member = (OMElement) memberIter.next();
+        OMElement facility = member.getFirstElement();
+        if (facility.getLocalName().equals("facility")) {
+          location = facility.getAttributeValue(new QName("name"));
+          break;
+        }
+      }
+    }
+    return location;
   }
 
   private void generatePropsFromMap() {
@@ -261,9 +261,17 @@ public class EventGenerator {
     }
   }
 
+  static WeekDay[] weekDays = { WeekDay.MO, WeekDay.TU, WeekDay.WE, WeekDay.TH,
+      WeekDay.FR, WeekDay.SA, WeekDay.SU };
+
+  private static WeekDay index2weekDay(String week) {
+    int index = Integer.parseInt(week) - 1;
+    return weekDays[index];
+  }
+
   private void makeRepeatedEvent() {
 
-    if (!props.contains(net.fortuna.ical4j.model.Property.DTSTART)) {
+    if (props.getProperty(net.fortuna.ical4j.model.Property.DTSTART) == null) {
       Date dtstart = (Date) map.get("condition.start");
       if (dtstart == null) {
         dtstart = (Date) map.get("start");
@@ -334,22 +342,22 @@ public class EventGenerator {
       @SuppressWarnings("unchecked")
       ArrayList<Date> dates = (ArrayList<Date>) map.get("exclusiveDates");
       // generate multiple EXDATEs for avoiding iCal.app bug
-      for (Date date : dates) {
-        DateList dateList = new DateList();
-        dateList.add(new net.fortuna.ical4j.model.Date(date));
-        dateList = new DateList(dateList,
-            net.fortuna.ical4j.model.parameter.Value.DATE);
-        props.add(new ExDate(dateList));
+
+      if (map.containsKey("allday") && map.get("allday").equals("true")) {
+        for (Date date : dates) {
+          DateList dateList = new DateList();
+          dateList.add(new net.fortuna.ical4j.model.Date(date));
+          dateList = new DateList(dateList,
+              net.fortuna.ical4j.model.parameter.Value.DATE);
+          props.add(new ExDate(dateList));
+        }
+      } else {
+        for (Date date : dates) {
+          DateList dateList = new DateList();
+          dateList.add(new net.fortuna.ical4j.model.DateTime(date));
+          props.add(new ExDate(dateList));
+        }
       }
-      // DateList dateList = new DateList();
-      // for (Date date : dates) {
-      // dateList.add(new net.fortuna.ical4j.model.Date(date));
-      // }
-      // if (!dateList.isEmpty()) {
-      // dateList = new DateList(dateList,
-      // net.fortuna.ical4j.model.parameter.Value.DATE);
-      // props.add(new ExDate(dateList));
-      // }
     }
   }
 
