@@ -95,7 +95,12 @@ public class EventGenerator {
     }
 
     if (map.containsKey("detail")) {
-      props.add(new Summary((String) map.get("detail")));
+      if (map.containsKey("plan") && !map.get("plan").equals("")) {
+        props.add(new Summary((String) map.get("plan") + ":"
+            + (String) map.get("detail")));
+      } else {
+        props.add(new Summary((String) map.get("detail")));
+      }
     }
     if (map.containsKey("description")) {
       props.add(new Description((String) map.get("description")));
